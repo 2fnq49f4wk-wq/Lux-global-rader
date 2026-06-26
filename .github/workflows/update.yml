@@ -1,0 +1,34 @@
+name: Update News Data
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      
+      - name: Install deps
+        run: |
+          pip install pyrogram tgcrypto
+      
+      - name: Run scraper
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+        run: python main.py
+      
+      - name: Commit & Push
+        run: |
+          git config user.name "Bot"
+          git config user.email "bot@github.com"
+          git add docs/data.json
+          git diff-index --quiet HEAD || git commit -m "Update $(date -u +'%Y-%m-%d %H:%M:%S')"
+          git push
