@@ -473,22 +473,43 @@ async function pullQuakes(){
 
 // ---- DeepStateMap 전선 (프록시) ----
 async function pullFront(){
+  // DeepStateMap 공식 API는 history/<ts>/geojson 형식이라 ts를 먼저 알아내야 함.
+  // 1순위: 공식 API (마지막 ts 조회 → geojson), 2순위: GitHub 일일 미러
   try{
-    const r=await fetch(px("https://deepstatemap.live/api/history/last/geojson"));
-    let j=await r.json();
-    // 응답이 배열로 감싸진 경우 풀기: [ {...fc...} ] 또는 [ {map:{...}} ]
-    if(Array.isArray(j)) j = j[0] || {};
-    if(j && j.map) j = j.map;            // 일부 응답은 {map:{features}}
-    let feats = (j && j.features) ? j.features
-              : (j && j.geojson && j.geojson.features) ? j.geojson.features
-              : null;
-    console.log("front raw:", Array.isArray(feats)?feats.length+" features":"none", j);
-    if(feats && feats.length){
-      renderFront({type:"FeatureCollection",
-        features:feats.map(f=>({type:"Feature",geometry:f.geometry,properties:{name:(f.properties||{}).name||""}}))});
-      document.querySelector('.lchip[data-l="front"]').classList.add("on");
+    // (1) 공식: 최근 history 목록에서 마지막 id 가져오기
+    const lr=await fetch(px("https://deepstatemap.live/api/history"));
+    const hist=await lr.json();
+    if(Array.isArray(hist)&&hist.length){
+      const last=hist[hist.length-1];
+      const id=last.id||last;
+      const gr=await fetch(px("https://deepstatemap.live/api/history/"+id+"/geojson"));
+      const j=await gr.json();
+      const feats=(j&&j.features)?j.features:(Array.isArray(j)&&j[0]&&j[0].features?j[0].features:null);
+      if(feats&&feats.length){
+        console.log("front OK (official):",feats.length);
+        renderFront({type:"FeatureCollection",features:feats.map(f=>({type:"Feature",geometry:f.geometry,properties:{name:(f.properties||{}).name||""}}))});
+        document.querySelector('.lchip[data-l="front"]').classList.add("on");
+        return;
+      }
     }
-  }catch(e){console.error("front",e);}
+  }catch(e){console.warn("front official fail",e);}
+  // (2) GitHub 일일 미러 (raw.githubusercontent.com — 화이트리스트 통과)
+  try{
+    const idxR=await fetch(px("https://api.github.com/repos/cyterat/deepstate-map-data/contents/data"));
+    const files=await idxR.json();
+    const gj=(files||[]).filter(f=>f.name&&f.name.endsWith(".geojson")).sort((a,b)=>a.name<b.name?-1:1);
+    if(gj.length){
+      const url=gj[gj.length-1].download_url;
+      const r=await fetch(px(url));
+      const j=await r.json();
+      const feats=(j&&j.features)||null;
+      if(feats&&feats.length){
+        console.log("front OK (mirror):",feats.length);
+        renderFront({type:"FeatureCollection",features:feats.map(f=>({type:"Feature",geometry:f.geometry,properties:{name:(f.properties||{}).name||""}}))});
+        document.querySelector('.lchip[data-l="front"]').classList.add("on");
+      }
+    }
+  }catch(e){console.error("front mirror fail",e);}
 }
 
 // ---- CelesTrak 위성 TLE (프록시) ----
