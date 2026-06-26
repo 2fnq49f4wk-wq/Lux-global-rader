@@ -119,7 +119,7 @@
       <div class="wchip" data-w="pressure">📊 기압</div>
       <div class="wchip" data-w="wind">💨 풍속</div>
       <div class="wchip" data-w="precip">🌦 강수량</div>
-      <input id="owmkey" placeholder="OWM API key (선택)" />
+      <input id="owmkey" type="hidden" />
       <input id="wopacity" type="range" min="20" max="100" value="70" title="불투명도">
     </div>
     <div id="feed"></div>
@@ -145,18 +145,20 @@
 </div>
 
 <script>
-// ===== Cesium 초기화 (Ion 토큰 없이 ArcGIS 타일 사용) =====
+// ===== Cesium 초기화 (Ion 토큰 없이, 버전 안전한 UrlTemplate 타일 사용) =====
 Cesium.Ion.defaultAccessToken = undefined;
-window.onerror = function(msg, url, lineNo, columnNo, error) {
-  if(msg.includes("getDerivedResources")) return true; // Cesium Ion 에러 무시
+window.onerror = function(msg){
+  if((""+msg).includes("getDerivedResources")) return true;
   return false;
 };
 
-const imagery = new Cesium.ArcGisMapServerImageryProvider({
-  url:"https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer"
+// ArcGIS World Imagery를 UrlTemplate으로 직접 호출 (provider 버전 차이 우회)
+const imagery = new Cesium.UrlTemplateImageryProvider({
+  url:"https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  maximumLevel:18
 });
 const viewer = new Cesium.Viewer("cesiumContainer",{
-  imageryProvider: imagery,
+  baseLayer: new Cesium.ImageryLayer(imagery),
   baseLayerPicker:false, geocoder:false, homeButton:false, sceneModePicker:true,
   navigationHelpButton:false, animation:false, timeline:false, fullscreenButton:false,
   infoBox:true, selectionIndicator:true,
@@ -165,8 +167,10 @@ const viewer = new Cesium.Viewer("cesiumContainer",{
 });
 viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString("#0a0e14");
 viewer.scene.backgroundColor = Cesium.Color.BLACK;
-viewer.imageryLayers.addImageryProvider(new Cesium.ArcGisMapServerImageryProvider({
-  url:"https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer"
+// 경계/지명 라벨 오버레이
+viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+  url:"https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+  maximumLevel:18
 }));
 viewer.camera.setView({destination: Cesium.Cartesian3.fromDegrees(10, 25, 20000000)});
 
@@ -418,16 +422,11 @@ document.querySelector(".layers").addEventListener("click",e=>{
 // RainViewer: 키 없음 / OpenWeatherMap: 키 입력 시 활성
 const weatherLayers={};   // key -> Cesium ImageryLayer
 let rainTs=0;             // RainViewer 최신 프레임 timestamp
+const OWM_KEY="ec49d2ca3a404106e31c53b2ce17db1d"; // 내장 키
 const OWM_LOCK=["clouds","temp","pressure","wind","precip"];
-function owmKey(){return (document.getElementById("owmkey").value||"").trim();}
+function owmKey(){return OWM_KEY;}
 
-function refreshLocks(){
-  const has=!!owmKey();
-  document.querySelectorAll('.wchip').forEach(c=>{
-    if(OWM_LOCK.includes(c.dataset.w)) c.classList.toggle("locked",!has);
-  });
-}
-document.getElementById("owmkey").addEventListener("input",refreshLocks);
+function refreshLocks(){ /* 키 내장됨 — 잠금 없음 */ }
 refreshLocks();
 
 async function getRainTs(){
