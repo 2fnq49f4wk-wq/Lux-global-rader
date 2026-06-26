@@ -6,7 +6,7 @@
 <title>Global Event Radar</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-  :root{--bg:#0a0e14;--panel:#0f1419;--line:#1b2230;--txt:#e6edf3;--mut:#8b97a7;--war:#ff5252;--eco:#ffb300;--pol:#42a5f5;--crit:#ff1744}
+  :root{--bg:#0a0e14;--panel:#0f1419;--line:#1b2230;--txt:#e6edf3;--mut:#8b97a7;--war:#ff5252;--eco:#ffb300;--pol:#42a5f5;--crit:#ff1744;--mil:#00e5ff;--base:#ff9100;--quake:#e040fb}
   *{box-sizing:border-box}
   html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);font:13px/1.5 system-ui,Roboto}
   #app{display:grid;grid-template-columns:380px 1fr;height:100%;gap:1px;background:var(--line)}
@@ -34,6 +34,7 @@
   .chip[data-c="War"].active{border-color:var(--war);color:var(--war)}
   .chip[data-c="Economy"].active{border-color:var(--eco);color:var(--eco)}
   .chip[data-c="Politics"].active{border-color:var(--pol);color:var(--pol)}
+  .chip[data-c="mil"].active{border-color:var(--mil);color:var(--mil)}
   select{background:#18212d;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font:11px monospace}
   #feed{flex:1;overflow-y:auto;font-size:12px}
   .item{padding:8px 14px;border-bottom:1px solid var(--line);cursor:pointer;border-left:3px solid transparent;display:flex;gap:8px}
@@ -54,11 +55,13 @@
   .pop-t{font-weight:600;margin-bottom:5px;font-size:12px;line-height:1.35}
   .pop-s{color:#c4ccd6;font-size:11px;line-height:1.4;margin-bottom:6px}
   .pop-m{color:var(--mut);font:10px/1.5 monospace}.pop-m a{color:var(--pol)}
-  .leaflet-control-layers{background:var(--panel)!important;color:var(--txt)!important;border:1px solid var(--line)!important;font:11px monospace}
+  .plane{font-size:18px;filter:drop-shadow(0 0 3px #00e5ff)}
+  .leaflet-control-layers{background:var(--panel)!important;color:var(--txt)!important;border:1px solid var(--line)!important;font:11px monospace;max-height:80vh;overflow:auto}
   .leaflet-control-layers label{color:var(--txt)}
-  .legend{position:absolute;bottom:16px;right:16px;z-index:500;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font:10px monospace;color:var(--mut)}
+  .legend{position:absolute;bottom:16px;right:16px;z-index:500;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font:10px monospace;color:var(--mut);max-height:45vh;overflow:auto}
   .legend span{display:flex;align-items:center;gap:6px;margin:3px 0}.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
   #status{position:absolute;top:12px;left:12px;background:rgba(0,0,0,.6);padding:6px 12px;border-radius:4px;font:11px monospace;z-index:501}
+  #milstat{position:absolute;top:44px;left:12px;background:rgba(0,229,255,.12);border:1px solid var(--mil);color:var(--mil);padding:4px 10px;border-radius:4px;font:10px monospace;z-index:501;display:none}
   @media(max-width:768px){#app{grid-template-columns:1fr;grid-template-rows:auto 60%}#side{max-height:46vh}}
 </style>
 </head>
@@ -88,6 +91,7 @@
       <div class="chip active" data-c="War">War</div>
       <div class="chip active" data-c="Economy">Economy</div>
       <div class="chip active" data-c="Politics">Politics</div>
+      <div class="chip" data-c="mil">✈ MIL</div>
       <select id="period"><option value="86400">24h</option><option value="259200">3d</option><option value="604800" selected>7d</option></select>
       <select id="minimp"><option value="0">All</option><option value="6">≥6</option><option value="8">≥8</option></select>
     </div>
@@ -96,11 +100,15 @@
   <div style="position:relative">
     <div id="map"></div>
     <div id="status"></div>
+    <div id="milstat"></div>
     <div class="legend">
       <span><i style="background:var(--war)"></i>War</span>
       <span><i style="background:var(--eco)"></i>Economy</span>
       <span><i style="background:var(--pol)"></i>Politics</span>
       <span><i style="background:var(--crit)"></i>Critical≥8</span>
+      <span><i style="background:var(--mil)"></i>Military aircraft</span>
+      <span><i style="background:var(--base)"></i>Military base</span>
+      <span><i style="background:var(--quake)"></i>Earthquake M4.5+</span>
       <span><i style="background:#ff1744;opacity:.5"></i>Occupied</span>
       <span><i style="background:#9ccc65;opacity:.6"></i>Liberated</span>
       <span><i style="background:#888;opacity:.6"></i>Gray zone</span>
@@ -117,7 +125,6 @@ map.setMaxBounds([[-85,-180],[85,180]]);
 const satellite=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{noWrap:true,maxZoom:18});
 const labels=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",{noWrap:true,maxZoom:18});
 const hybrid=L.layerGroup([satellite,labels]);
-
 const baseLayers={
   "Dark":L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{attribution:"© CARTO",subdomains:"abcd",noWrap:true}),
   "Hybrid (Satellite+Labels)":hybrid,
@@ -128,13 +135,58 @@ const baseLayers={
 baseLayers["Dark"].addTo(map);
 
 const frontlineLayer=L.layerGroup().addTo(map);
-L.control.layers(baseLayers,{"🇺🇦 Ukraine Frontline":frontlineLayer},{position:"topright",collapsed:false}).addTo(map);
+const milLayer=L.layerGroup();
+const baseMilLayer=L.layerGroup();
+const quakeLayer=L.layerGroup();
+L.control.layers(baseLayers,{
+  "🇺🇦 Ukraine Frontline":frontlineLayer,
+  "✈ Military Aircraft (live)":milLayer,
+  "🪖 Military Bases":baseMilLayer,
+  "🌐 Earthquakes M4.5+":quakeLayer
+},{position:"topright",collapsed:false}).addTo(map);
+
+// === 주요 군사기지 (공개 정보 기반 좌표) ===
+const BASES=[
+  ["Pentagon (US DoD HQ)",38.8719,-77.0563,"🇺🇸"],
+  ["Naval Base Norfolk",36.9460,-76.3290,"🇺🇸"],
+  ["Ramstein Air Base",49.4369,7.6003,"🇩🇪"],
+  ["RAF Lakenheath",52.4093,0.5610,"🇬🇧"],
+  ["NATO HQ Brussels",50.8786,4.4239,"🇳"],
+  ["Incirlik Air Base",37.0017,35.4259,"🇹🇷"],
+  ["Al Udeid Air Base",25.1173,51.3150,"🇶🇦"],
+  ["Diego Garcia",-7.3133,72.4111,"🇬🇧"],
+  ["Guam Andersen AFB",13.5840,144.9240,"🇺🇸"],
+  ["Yokosuka Naval Base",35.2937,139.6720,"🇯🇵"],
+  ["Kadena Air Base",26.3516,127.7692,"🇯🇵"],
+  ["Camp Humphreys",36.9665,127.0309,"🇰🇷"],
+  ["Pearl Harbor",21.3645,-157.9498,"🇺🇸"],
+  ["Kaliningrad (Baltic Fleet)",54.7104,20.4522,"🇷🇺"],
+  ["Sevastopol Naval Base",44.6166,33.5254,"🇷🇺"],
+  ["Hmeimim Air Base (Syria)",35.4011,35.9486,"🇷🇺"],
+  ["Tartus Naval Base",34.8950,35.8866,"🇷🇺"],
+  ["Djibouti (multinational)",11.5471,43.1595,"🌍"],
+  ["Bagram (former)",34.9461,69.2650,"🏴"],
+  ["Guantanamo Bay",19.9061,-75.2089,"🇺🇸"],
+  ["Thule/Pituffik Space Base",76.5312,-68.7032,"🇺🇸"],
+  ["Vandenberg SFB",34.7420,-120.5724,"🇺🇸"],
+  ["Plesetsk Cosmodrome",62.9257,40.5772,"🇷🇺"],
+  ["Jiuquan (PLA)",40.9606,100.2917,"🇨🇳"],
+  ["Yulin Naval Base (Hainan)",18.2300,109.5000,"🇨"],
+  ["Djibouti PLA Support Base",11.5900,43.0650,"🇨🇳"],
+  ["Nevatim Airbase",31.2080,35.0120,"🇮🇱"],
+];
+BASES.forEach(([name,lat,lng,flag])=>{
+  L.circleMarker([lat,lng],{radius:6,color:"#fff",weight:1,fillColor:"#ff9100",fillOpacity:.9})
+    .bindPopup(`<div class="pop"><div class="pc"><div class="pop-t">${flag} ${name}</div><div class="pop-m">군사기지 · 공개정보 기준 위치</div></div></div>`)
+    .addTo(baseMilLayer);
+});
 
 let ALL=[];
 const markers=new Map();
 const active=new Set(["War","Economy","Politics"]);
 const TCOLOR={1:"#ff1744",2:"#ff5252",3:"#ffb300",4:"#9ccc65",5:"#42a5f5"};
 const TLABEL={1:"SEVERE",2:"HIGH",3:"ELEVATED",4:"GUARDED",5:"LOW"};
+const FLAG={us:"🇺🇸",uk:"🇬🇧",ru:"🇷🇺",ua:"🇺🇦",cn:"🇨🇳",il:"🇮🇱",fr:"🇫",de:"🇩🇪",nato:"🇳🇦",tr:"🇹🇷",jp:"🇯🇵",kr:"🇰🇷",in:"🇮🇳",au:"🇦🇺",ca:"🇨🇦",pl:"🇵🇱",it:"🇮🇹",es:"🇪🇸"};
 
 function impClass(s){return s>=8?"b-hi":s>=6?"b-md":"b-lo"}
 function ago(ts){const d=Date.now()/1000-ts;if(d<3600)return Math.floor(d/60)+"m";if(d<86400)return Math.floor(d/3600)+"h";return Math.floor(d/86400)+"d"}
@@ -161,22 +213,50 @@ function frontStyle(n){
 function renderFrontline(geo){
   frontlineLayer.clearLayers();
   try{
-    L.geoJSON(geo,{
-      style:f=>frontStyle((f.properties&&f.properties.name)||""),
+    L.geoJSON(geo,{style:f=>frontStyle((f.properties&&f.properties.name)||""),
       onEachFeature:(f,l)=>{const n=f.properties&&f.properties.name;if(n)l.bindPopup(`<div class="pop"><div class="pc"><div class="pop-m">${esc((n+"").split("///")[1]||n)}</div></div></div>`)}
     }).addTo(frontlineLayer);
-  }catch(e){console.error("frontline render fail",e)}
+  }catch(e){console.error(e)}
 }
+
+function renderQuakes(qs){
+  quakeLayer.clearLayers();
+  (qs||[]).forEach(q=>{
+    L.circleMarker([q.lat,q.lng],{radius:3+q.mag,color:"#e040fb",weight:1,fillColor:"#e040fb",fillOpacity:.5})
+      .bindPopup(`<div class="pop"><div class="pc"><div class="pop-t">🌐 M${q.mag} 지진</div><div class="pop-m">${esc(q.place)} · ${ago(q.ts)} ago${q.url?`<br><a href="${q.url}" target="_blank">USGS ↗</a>`:""}</div></div></div>`)
+      .addTo(quakeLayer);
+  });
+}
+
+// === 군용기 실시간 (IntelSky) ===
+const planes=new Map();let milTimer=null;
+function planeIcon(track){return L.divIcon({className:"",html:`<div class="plane" style="transform:rotate(${track||0}deg)">✈</div>`,iconSize:[20,20],iconAnchor:[10,10]});}
+async function fetchMil(){
+  if(!map.hasLayer(milLayer))return;
+  try{
+    const r=await fetch("https://intelsky.org/api/");const data=await r.json();
+    const ac=(data.ac||[]).filter(a=>a.dbFlags&&(""+a.dbFlags).length>=2&&a.lat&&a.lon);
+    const seen=new Set();
+    ac.forEach(a=>{
+      seen.add(a.hex);
+      const flag=FLAG[(""+a.dbFlags).toLowerCase()]||"🏴";
+      const fl=a.alt_baro?`FL${Math.round(a.alt_baro/100)}`:"—";
+      const pop=`<div class="pop"><div class="pc"><div class="pop-t">${flag} ${esc(a.flight||a.r||a.hex)}</div><div class="pop-s">${esc(a.desc||a.t||"Unknown type")}</div><div class="pop-m">운용: ${esc(a.ownOp||(""+a.dbFlags).toUpperCase())}<br>고도 ${fl} · 속도 ${a.gs?Math.round(a.gs)+"kt":"—"} · 침로 ${a.track?Math.round(a.track)+"°":"—"}<br>HEX ${esc(a.hex)}${a.squawk?` · SQ ${esc(a.squawk)}`:""}</div></div></div>`;
+      if(planes.has(a.hex)){const m=planes.get(a.hex);m.setLatLng([a.lat,a.lon]);m.setIcon(planeIcon(a.track));m.getPopup()&&m.setPopupContent(pop);}
+      else{const m=L.marker([a.lat,a.lon],{icon:planeIcon(a.track)}).bindPopup(pop);m.addTo(milLayer);planes.set(a.hex,m);}
+    });
+    for(const[hex,m]of planes){if(!seen.has(hex)){milLayer.removeLayer(m);planes.delete(hex);}}
+    const ms=document.getElementById("milstat");ms.style.display="block";ms.textContent=`✈ ${ac.length} military aircraft tracked`;
+  }catch(e){console.error("mil fail",e);const ms=document.getElementById("milstat");ms.style.display="block";ms.textContent="✈ aircraft feed unavailable";}
+}
+map.on("overlayadd",e=>{if(e.layer===milLayer){fetchMil();milTimer=setInterval(fetchMil,15000);document.querySelector('.chip[data-c="mil"]').classList.add("active");}});
+map.on("overlayremove",e=>{if(e.layer===milLayer){clearInterval(milTimer);planes.forEach(m=>milLayer.removeLayer(m));planes.clear();document.getElementById("milstat").style.display="none";document.querySelector('.chip[data-c="mil"]').classList.remove("active");}});
 
 function popupHTML(d){
   const color=COLOR[d.category];
   const img=d.img?`<img src="${d.img}" onerror="this.style.display='none'">`:"";
   const sum=d.summary?`<div class="pop-s">${esc(d.summary)}</div>`:"";
-  return `<div class="pop">${img}<div class="pc">
-    <div class="pop-t">${esc(d.title)}</div>${sum}
-    <div class="pop-m">📍 ${esc(d.place||d.category)} · <b style="color:${color}">${d.impact_score}/10</b> · ${ago(d.ts)} ago<br>
-    📡 ${esc(d.source)}${d.url?` · <a href="${d.url}" target="_blank">read more ↗</a>`:""}</div>
-  </div></div>`;
+  return `<div class="pop">${img}<div class="pc"><div class="pop-t">${esc(d.title)}</div>${sum}<div class="pop-m">📍 ${esc(d.place||d.category)} · <b style="color:${color}">${d.impact_score}/10</b> · ${ago(d.ts)} ago<br>📡 ${esc(d.source)}${d.url?` · <a href="${d.url}" target="_blank">read more ↗</a>`:""}</div></div></div>`;
 }
 
 function filtered(){
@@ -191,8 +271,7 @@ function render(){
   data.forEach(d=>{
     const color=COLOR[d.category],crit=d.impact_score>=8;
     const m=L.circleMarker([d.lat,d.lng],{radius:4+d.impact_score*0.7,color:"#fff",weight:crit?2:1,fillColor:color,fillOpacity:0.85});
-    m.bindPopup(popupHTML(d),{maxWidth:260});
-    m.addTo(map);markers.set(d.id,m);
+    m.bindPopup(popupHTML(d),{maxWidth:260});m.addTo(map);markers.set(d.id,m);
   });
   data.forEach(d=>{
     const el=document.createElement("div");el.className="item "+d.category;
@@ -205,8 +284,9 @@ function render(){
 
 document.querySelector(".ctrls").addEventListener("click",e=>{
   const chip=e.target.closest(".chip");if(!chip)return;const c=chip.dataset.c;
+  if(c==="mil"){if(map.hasLayer(milLayer))map.removeLayer(milLayer);else map.addLayer(milLayer);return;}
   if(c==="all"){const on=!chip.classList.contains("active");
-    document.querySelectorAll(".chip").forEach(ch=>{ch.classList.toggle("active",on);if(ch.dataset.c!=="all")on?active.add(ch.dataset.c):active.delete(ch.dataset.c)});
+    document.querySelectorAll(".chip").forEach(ch=>{if(ch.dataset.c==="mil")return;ch.classList.toggle("active",on);if(ch.dataset.c!=="all")on?active.add(ch.dataset.c):active.delete(ch.dataset.c)});
   }else{chip.classList.toggle("active");chip.classList.contains("active")?active.add(c):active.delete(c);
     document.querySelector('.chip[data-c="all"]').classList.toggle("active",active.size===3)}
   render();
@@ -220,6 +300,7 @@ async function load(){
     const r=await fetch("data.json?t="+Date.now());const d=await r.json();
     ALL=d.events||[];setThreat(d.threat);
     if(d.frontline)renderFrontline(d.frontline);
+    if(d.quakes)renderQuakes(d.quakes);
     document.getElementById("loaded").textContent=d.updated?new Date(d.updated+"Z").toLocaleTimeString():"-";
     setStatus("✓ "+ALL.length+" events",true);render();
   }catch(e){setStatus("⚠ load failed",false);console.error(e)}
