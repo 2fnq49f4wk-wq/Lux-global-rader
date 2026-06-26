@@ -476,9 +476,19 @@ async function pullQuakes(){
 async function pullFront(){
   try{
     const r=await fetch(px("https://deepstatemap.live/api/history/last/geojson"));
-    const j=await r.json();
-    const feats=Array.isArray(j)?null:(j.features||null);
-    if(feats)renderFront({type:"FeatureCollection",features:feats.map(f=>({type:"Feature",geometry:f.geometry,properties:{name:(f.properties||{}).name||""}}))});
+    let j=await r.json();
+    // 응답이 배열로 감싸진 경우 풀기: [ {...fc...} ] 또는 [ {map:{...}} ]
+    if(Array.isArray(j)) j = j[0] || {};
+    if(j && j.map) j = j.map;            // 일부 응답은 {map:{features}}
+    let feats = (j && j.features) ? j.features
+              : (j && j.geojson && j.geojson.features) ? j.geojson.features
+              : null;
+    console.log("front raw:", Array.isArray(feats)?feats.length+" features":"none", j);
+    if(feats && feats.length){
+      renderFront({type:"FeatureCollection",
+        features:feats.map(f=>({type:"Feature",geometry:f.geometry,properties:{name:(f.properties||{}).name||""}}))});
+      document.querySelector('.lchip[data-l="front"]').classList.add("on");
+    }
   }catch(e){console.error("front",e);}
 }
 
@@ -532,17 +542,27 @@ const MILQ='(airstrike OR shelling OR "missile strike" OR artillery OR offensive
 
 const WORKER_BASE=PROXY.replace(/\/\?url=$/,"");
 const EVENTS_URL=WORKER_BASE+"/events";
+async function directGDELT(){
+  await Promise.all([
+    pullGDELT(GQ.War,"War",false),
+    pullGDELT(GQ.Economy,"Economy",false),
+    pullGDELT(GQ.Politics,"Politics",false),
+    pullGDELT(MILQ,"Military",true)
+  ]);
+  pruneAndPublish();
+}
 async function cycleEvents(){
   setStatus("⟳ syncing events…",true);
+  let got=0;
   try{
     const r=await fetch(EVENTS_URL+"?t="+Date.now());const j=await r.json();
     (j.events||[]).forEach(e=>{ if(!store.has(e.id)) store.set(e.id,e); });
-    pruneAndPublish();
+    got=(j.events||[]).length;
     if(j.updated)document.getElementById("loaded").textContent=new Date(j.updated*1000).toLocaleTimeString();
-  }catch(e){
-    await Promise.all([pullGDELT(GQ.War,"War",false),pullGDELT(GQ.Economy,"Economy",false),pullGDELT(GQ.Politics,"Politics",false),pullGDELT(MILQ,"Military",true)]);
-    pruneAndPublish();
-  }
+  }catch(e){ console.warn("worker /events 실패",e); }
+  // Worker가 비어있거나(0건) 실패하면 브라우저가 직접 GDELT
+  if(store.size===0 || got===0){ await directGDELT(); }
+  else pruneAndPublish();
 }
 async function cycleGeo(){ await Promise.all([pullFront(),pullQuakes()]); }
 setInterval(()=>{ if(map.hasLayer(satLayer)) pullSats().then(()=>updateSats()); }, 3600000);
