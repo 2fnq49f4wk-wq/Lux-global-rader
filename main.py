@@ -1,4 +1,4 @@
-import json, os, time, hashlib, urllib.request, urllib.parse, xml.etree.ElementTree as ET
+import json, os, time, re, hashlib, urllib.request, urllib.parse, xml.etree.ElementTree as ET
 from datetime import datetime
 
 FEEDS = [
@@ -101,15 +101,36 @@ def fetch_rss(url,source,dc):
         with urllib.request.urlopen(req,timeout=15) as r: raw=r.read()
         root=ET.fromstring(raw)
         for it in [e for e in root.iter() if sns(e.tag) in ("item","entry")][:20]:
-            title=desc=link=pub=""
+            title=desc=link=pub=img=""
             for ch in it:
                 tg=sns(ch.tag)
                 if tg=="title": title=(ch.text or "").strip()
-                elif tg in("description","summary","content"): desc=(ch.text or desc or "").strip()
+                elif tg in("description","summary"): desc=(ch.text or desc or "").strip()
+                elif tg=="encoded": desc=(ch.text or desc or "").strip()
                 elif tg=="link": link=(ch.text or ch.get("href") or "").strip()
                 elif tg in("pubDate","published","updated","date"): pub=pub or (ch.text or "").strip()
+                elif tg in("thumbnail","image"):
+                    u=ch.get("url")
+                    if u and not img: img=u
+                elif tg=="content":
+                    u=ch.get("url")
+                    if u and not img and re.search(r'\.(jpg|jpeg|png|webp)',u,re.I): img=u
+                    elif ch.text and not desc: desc=ch.text.strip()
+                elif tg=="enclosure":
+                    u=ch.get("url"); ty=ch.get("type","")
+                    if u and ("image" in ty or re.search(r'\.(jpg|jpeg|png|webp)',u,re.I)) and not img: img=u
+                elif tg=="group":
+                    for sub in ch:
+                        if sns(sub.tag) in("content","thumbnail"):
+                            u=sub.get("url")
+                            if u and not img: img=u
+            if not img and desc:
+                m=re.search(r'<img[^>]+src=["\']([^"\']+)',desc)
+                if m: img=m.group(1)
+            clean=re.sub(r'<[^>]+>','',desc); clean=re.sub(r'\s+',' ',clean).strip()[:280]
             if not title: continue
-            out.append({"title":title[:200],"full":f"{title} {desc}","pub":pub,"link":link,"source":source,"cat":dc})
+            out.append({"title":title[:200],"full":f"{title} {clean}","pub":pub,"link":link,
+                "source":source,"cat":dc,"img":img,"summary":clean})
     except Exception as e:
         print(f"SKIP {source}: {type(e).__name__} {e}")
     return out
@@ -127,49 +148,43 @@ def fetch_gdelt(query, cat):
             lng,lat=c[0],c[1]
             name=(p.get("name") or "").split("<")[0].strip()[:160]
             if not name: continue
-            out.append({"title":name,"full":name,"lat":lat,"lng":lng,"place":p.get("name","").split(",")[0][:40] if p.get("name") else "","cat":cat,"link":p.get("url",""),"source":"GDELT","pub":""})
+            out.append({"title":name,"full":name,"lat":lat,"lng":lng,"place":p.get("name","").split(",")[0][:40] if p.get("name") else "","cat":cat,"link":p.get("url","")})
     except Exception as e:
         print(f"GDELT {cat} fail: {type(e).__name__} {e}")
     return out
 
 def fetch_frontline():
-    """DeepStateMap 우크라이나 전선 GeoJSON. 공식 API → GitHub 미러 순서로 시도"""
-    # 1) 공식 API
     try:
         u="https://deepstatemap.live/api/history/last/geojson"
         req=urllib.request.Request(u,headers={"User-Agent":"deepstate-scraper/0.1"})
         with urllib.request.urlopen(req,timeout=30) as r: data=json.loads(r.read())
         feats=data.get("features") if isinstance(data,dict) else None
         if feats:
-            print(f"frontline OK (official): {len(feats)} features")
+            print(f"frontline OK (official): {len(feats)}")
             return simplify_fc(feats)
     except Exception as e:
         print(f"frontline official fail: {type(e).__name__} {e}")
-    # 2) GitHub 미러 (매일 03:00 UTC 갱신, 최신 날짜 파일)
     try:
         idx="https://api.github.com/repos/cyterat/deepstate-map-data/contents/data"
         req=urllib.request.Request(idx,headers={"User-Agent":"NewsBot/1.0","Accept":"application/vnd.github+json"})
         with urllib.request.urlopen(req,timeout=20) as r: files=json.loads(r.read())
-        gj=[f for f in files if f["name"].endswith(".geojson")]
-        gj.sort(key=lambda x:x["name"])
+        gj=sorted([f for f in files if f["name"].endswith(".geojson")],key=lambda x:x["name"])
         latest=gj[-1]["download_url"]
         req2=urllib.request.Request(latest,headers={"User-Agent":"NewsBot/1.0"})
         with urllib.request.urlopen(req2,timeout=30) as r: data=json.loads(r.read())
         feats=data.get("features",[])
         if feats:
-            print(f"frontline OK (mirror): {len(feats)} features")
+            print(f"frontline OK (mirror): {len(feats)}")
             return simplify_fc(feats)
     except Exception as e:
         print(f"frontline mirror fail: {type(e).__name__} {e}")
     return None
 
 def simplify_fc(feats):
-    """name만 남기고 좌표 보존 (용량 절감)"""
     out=[]
     for f in feats:
         p=f.get("properties") or {}
-        out.append({"type":"Feature","geometry":f.get("geometry"),
-            "properties":{"name":p.get("name","")}})
+        out.append({"type":"Feature","geometry":f.get("geometry"),"properties":{"name":p.get("name","")}})
     return {"type":"FeatureCollection","features":out}
 
 def load_existing():
@@ -182,13 +197,14 @@ def compute_threat(events, now):
     recent=[e for e in events if now-e["ts"]<=86400]
     crit=sum(1 for e in recent if e["impact_score"]>=8)
     war=sum(1 for e in recent if e["category"]=="War" and e["impact_score"]>=7)
-    s=crit*2+war
+    eco=sum(1 for e in recent if e["category"]=="Economy" and e["impact_score"]>=8)
+    s=crit*2+war+eco
     if s>=40: lvl=1
     elif s>=25: lvl=2
     elif s>=12: lvl=3
     elif s>=5: lvl=4
     else: lvl=5
-    return {"level":lvl,"critical_24h":crit,"war_24h":war,"score":s}
+    return {"level":lvl,"critical_24h":crit,"war_24h":war,"eco_24h":eco,"score":s,"total_24h":len(recent)}
 
 def main():
     now=int(time.time())
@@ -206,7 +222,8 @@ def main():
                 eid=mid(source,name,it["title"][:40])
                 if eid in events: continue
                 events[eid]={"id":eid,"title":it["title"],"lat":lat,"lng":lng,"category":cat2,
-                    "impact_score":imp,"source":source,"url":it["link"],"place":name,"ts":ts}
+                    "impact_score":imp,"source":source,"url":it["link"],"place":name,"ts":ts,
+                    "img":it.get("img",""),"summary":it.get("summary","")}
         time.sleep(0.2)
 
     gq={"War":'(war OR military OR strike OR missile OR invasion OR airstrike OR shelling OR offensive)',
@@ -219,7 +236,8 @@ def main():
             eid=mid("GDELT",round(it["lat"],3),round(it["lng"],3),it["title"][:40])
             if eid in events: continue
             events[eid]={"id":eid,"title":it["title"],"lat":it["lat"],"lng":it["lng"],"category":cat,
-                "impact_score":imp,"source":"GDELT","url":it["link"],"place":it["place"],"ts":now}
+                "impact_score":imp,"source":"GDELT","url":it["link"],"place":it["place"],"ts":now,
+                "img":"","summary":""}
         time.sleep(0.5)
 
     frontline=fetch_frontline()
