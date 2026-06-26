@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Global Event Radar</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{--bg:#0a0e14;--panel:#0f1419;--line:#1b2230;--txt:#e6edf3;--mut:#8b97a7;--war:#ff5252;--eco:#ffb300;--pol:#42a5f5;--crit:#ff1744}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);font:13px/1.5 system-ui,Roboto}
+  #app{display:grid;grid-template-columns:360px 1fr;height:100%;gap:1px;background:var(--line)}
+  #side{background:var(--panel);display:flex;flex-direction:column;overflow:hidden}
+  #map{height:100%}
+  header{padding:12px 16px;border-bottom:1px solid var(--line);flex-shrink:0}
+  header h1{margin:0 0 4px;font-size:14px;letter-spacing:.5px;text-transform:uppercase}
+  header .sub{font:11px monospace;color:var(--mut);display:flex;gap:8px;align-items:center}
+  .dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+  .dot.on{background:#10b981;box-shadow:0 0 6px #10b981}
+  .dot.off{background:#ef4444}
+  .filters{padding:8px 16px;border-bottom:1px solid var(--line);display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0}
+  .chip{cursor:pointer;user-select:none;padding:3px 8px;border:1px solid var(--line);border-radius:12px;font:11px monospace;color:var(--mut);transition:.2s}
+  .chip.active{color:var(--txt);border-color:#3b4a5e;background:#18212d}
+  .chip[data-c="War"].active{border-color:var(--war);color:var(--war)}
+  .chip[data-c="Economy"].active{border-color:var(--eco);color:var(--eco)}
+  .chip[data-c="Politics"].active{border-color:var(--pol);color:var(--pol)}
+  #feed{flex:1;overflow-y:auto;font-size:12px}
+  .item{padding:8px 14px;border-bottom:1px solid var(--line);cursor:pointer;border-left:3px solid transparent;display:flex;flex-direction:column;gap:4px}
+  .item:hover{background:#141c27}
+  .item.War{border-left-color:var(--war)} .item.Economy{border-left-color:var(--eco)} .item.Politics{border-left-color:var(--pol)}
+  .item .t{font-size:12px;line-height:1.3}
+  .item .m{display:flex;justify-content:space-between;align-items:center;font:10px monospace;color:var(--mut)}
+  .badge{padding:1px 6px;border-radius:6px;font-weight:600}
+  .b-hi{background:rgba(255,23,68,.2);color:var(--crit)}
+  .b-md{background:rgba(255,179,0,.15);color:var(--eco)}
+  .b-lo{background:rgba(66,165,245,.1);color:var(--pol)}
+  .marker{border-radius:50%;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:11px;color:#fff}
+  .marker.critical{animation:pulse 1.4s ease-out infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 currentColor;opacity:1}70%{box-shadow:0 0 0 20px transparent}100%{opacity:0}}
+  .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel);color:var(--txt)}
+  .leaflet-popup-content{margin:8px 10px;font-size:11px}
+  .pop-t{font-weight:600;margin-bottom:4px}
+  .pop-m{color:var(--mut);font-family:monospace;font-size:10px;line-height:1.4}
+  .legend{position:absolute;bottom:16px;right:16px;z-index:500;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font:10px monospace;color:var(--mut)}
+  .legend span{display:flex;align-items:center;gap:6px;margin:3px 0}
+  .legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+  #status{position:absolute;top:12px;left:12px;background:rgba(0,0,0,.6);padding:6px 12px;border-radius:4px;font:11px monospace;z-index:501}
+  @media(max-width:768px){#app{grid-template-columns:1fr;grid-template-rows:35% 65%}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="side">
+    <header>
+      <h1>Global Radar</h1>
+      <div class="sub"><span id="conn" class="dot off"></span><span id="loaded">loading…</span><span id="count">0</span></div>
+    </header>
+    <div class="filters">
+      <div class="chip active" data-c="all">ALL</div>
+      <div class="chip active" data-c="War">War</div>
+      <div class="chip active" data-c="Economy">Economy</div>
+      <div class="chip active" data-c="Politics">Politics</div>
+    </div>
+    <div id="feed"></div>
+  </div>
+  <div style="position:relative">
+    <div id="map"></div>
+    <div id="status"></div>
+    <div class="legend">
+      <span><i style="background:var(--war)"></i>War</span>
+      <span><i style="background:var(--eco)"></i>Economy</span>
+      <span><i style="background:var(--pol)"></i>Politics</span>
+      <span><i style="background:var(--crit)"></i>Critical≥8</span>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const COLOR = {War:"#ff5252", Economy:"#ffb300", Politics:"#42a5f5"};
+const map = L.map("map").setView([25,10],3);
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{attribution:"© OpenStreetMap © CARTO",subdomains:"abcd",maxZoom:19}).addTo(map);
+
+const layer = L.layerGroup().addTo(map);
+const store = new Map();
+const active = new Set(["War","Economy","Politics"]);
+
+function impactClass(s){return s>=8?"b-hi":s>=6?"b-md":"b-lo"}
+
+function buildMarker(d){
+  const color = COLOR[d.category];
+  const critical = d.impact_score >= 8;
+  const size = 12 + d.impact_score * 2.5;
+  const icon = L.divIcon({
+    className:"",
+    html:`<div class="marker ${critical?'critical':''}" style="width:${size}px;height:${size}px;background:${color};color:#fff">•</div>`,
+    iconSize:[size,size], iconAnchor:[size/2,size/2]
+  });
+  const ts = new Date(d.ts*1000).toLocaleString();
+  return L.marker([d.lat,d.lng],{icon}).bindPopup(
+    `<div class="pop-t">${d.title}</div>
+     <div class="pop-m">${d.category} · <b>${d.impact_score}/10</b><br>${ts}<br><i>${d.source}</i></div>`);
+}
+
+function visible(d){return active.has(d.category)}
+function upsert(d){
+  if(store.has(d.id)) return;
+  const marker = buildMarker(d);
+  store.set(d.id,{data:d,marker});
+  if(visible(d)) marker.addTo(layer);
+  addFeed(d);
+}
+
+function addFeed(d){
+  const el = document.createElement("div");
+  el.className = "item " + d.category;
+  el.dataset.cat = d.category;
+  el.style.display = visible(d) ? "" : "none";
+  el.innerHTML = 
+    `<div class="t">${d.title}</div>
+     <div class="m"><span>${d.source.replace("@","")}</span><span class="badge ${impactClass(d.impact_score)}">${d.impact_score}/10</span></div>`;
+  el.onclick = ()=>{ map.flyTo([d.lat,d.lng],5); store.get(d.id)?.marker.openPopup(); };
+  document.getElementById("feed").prepend(el);
+}
+
+function applyFilters(){
+  for(const {data,marker} of store.values()){
+    const show = visible(data);
+    if(show && !layer.hasLayer(marker)) marker.addTo(layer);
+    if(!show && layer.hasLayer(marker)) layer.removeLayer(marker);
+  }
+  document.querySelectorAll("#feed .item").forEach(el=>{
+    el.style.display = active.has(el.dataset.cat) ? "" : "none";
+  });
+}
+
+document.getElementById("filters").addEventListener("click",e=>{
+  const chip = e.target.closest(".chip"); if(!chip) return;
+  const c = chip.dataset.c;
+  if(c==="all"){
+    const on = !chip.classList.contains("active");
+    document.querySelectorAll("#filters .chip").forEach(ch=>{
+      ch.classList.toggle("active",on);
+      if(ch.dataset.c!=="all") on?active.add(ch.dataset.c):active.delete(ch.dataset.c);
+    });
+  }else{
+    chip.classList.toggle("active");
+    chip.classList.contains("active")?active.add(c):active.delete(c);
+    document.querySelector('.chip[data-c="all"]').classList.toggle("active",active.size===3);
+  }
+  applyFilters();
+});
+
+function setStatus(txt, on){
+  document.getElementById("status").textContent = txt;
+  document.getElementById("conn").className = "dot " + (on?"on":"off");
+}
+
+async function load(){
+  try{
+    const r = await fetch("data.json?t=" + Date.now());
+    const d = await r.json();
+    document.getElementById("loaded").textContent = new Date(d.updated).toLocaleTimeString();
+    document.getElementById("count").textContent = d.total + " events";
+    setStatus("✓ " + d.total + " events", true);
+    d.events.forEach(upsert);
+    applyFilters();
+  }catch(e){
+    setStatus("⚠ load failed", false);
+  }
+}
+
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
