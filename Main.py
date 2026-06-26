@@ -1,16 +1,12 @@
-import asyncio, json, re, time, os
-from datetime import datetime, timedelta
+import asyncio, json, os
+from datetime import datetime
 from pyrogram import Client
-from pyrogram.errors import FloodWait
 
-# Telegram API (GitHub Secrets에서 받음)
 API_ID = int(os.getenv("TELEGRAM_API_ID", "0"))
 API_HASH = os.getenv("TELEGRAM_API_HASH", "")
 SESSION = "anon"
 
-# 모니터할 채널 (50+)
 CHANNELS = [
-    # === War / Conflict
     "@liveuamap", "@wartranslated", "@rybar", "@militarylandnet",
     "@conflictforensics", "@GeoConfirmed", "@FrontoVsUA", "@ISWresearch",
     "@SouthFrontEN", "@CoalitionNews", "@mod_russia_en", "@DefenseMinistryUA",
@@ -18,39 +14,21 @@ CHANNELS = [
     "@NOABBmapper", "@type_95_tank", "@Topografist", "@WarTranslated",
     "@RusWarMap", "@Geolocation_N", "@HotlineHeadquarters", "@mariupol_now",
     "@CensorNet", "@moklasen", "@Andriy_Dubov", "@TelecomDoctrine",
-    
-    # === Economics
     "@ReutersLive", "@Reuters", "@Bloomberg", "@FT",
     "@YahooFinance", "@CNBC", "@WSJ", "@MarketWatch",
     "@ECB", "@FederalReserve", "@bankofengland", "@BoJ_en",
     "@BankofKorea", "@InvestorsDaily", "@DeItaliaBanca",
-    
-    # === Politics
     "@BBCNews", "@AP", "@AFP", "@DW_News",
     "@EURACTIV_EN", "@GlobalTimes_CN", "@chinadailyusa", "@NHK_WORLD",
     "@YonhapNews_en", "@ArirangNewsTV", "@kbsworld",
     "@UN", "@WhiteHouse", "@StateDept", "@UKForeignOffice",
-    
-    # === Tech / Markets
     "@TechCrunch", "@cnbc_tv", "@ZeroHedge",
 ]
 
 KEYWORDS = {
-    "War": [
-        "strike", "missile", "shelling", "bombing", "invasion", "military",
-        "combat", "attack", "offensive", "ceasefire", "evacuation", "casualty",
-        "drone", "artillery", "tank", "battalion", "regiment", "frontline",
-    ],
-    "Economy": [
-        "rate", "inflation", "recession", "gdp", "interest", "fed", "ecb",
-        "default", "crisis", "market", "stock", "crypto", "oil",
-        "commodity", "export", "import", "tariff", "sanction",
-    ],
-    "Politics": [
-        "election", "summit", "meeting", "diplomacy", "negotiation", "vote",
-        "parliament", "congress", "minister", "president", "sanctions",
-        "treaty", "coup", "resign",
-    ]
+    "War": ["strike", "missile", "shelling", "bombing", "invasion", "military", "combat", "attack", "offensive", "ceasefire", "evacuation", "casualty", "drone", "artillery", "tank", "battalion", "regiment", "frontline"],
+    "Economy": ["rate", "inflation", "recession", "gdp", "interest", "fed", "ecb", "default", "crisis", "market", "stock", "crypto", "oil", "commodity", "export", "import", "tariff", "sanction"],
+    "Politics": ["election", "summit", "meeting", "diplomacy", "negotiation", "vote", "parliament", "congress", "minister", "president", "sanctions", "treaty", "coup", "resign"],
 }
 
 def extract_category(text):
@@ -85,75 +63,80 @@ async def fetch_channel_messages(client, channel, limit=20):
     try:
         async for msg in client.get_chat_history(channel, limit=limit):
             if msg.text:
-                messages.append({
-                    "text": msg.text[:300],
-                    "channel": channel,
-                    "timestamp": int(msg.date.timestamp()),
-                })
+                messages.append({"text": msg.text[:300], "channel": channel, "timestamp": int(msg.date.timestamp())})
     except Exception as e:
-        print(f"⚠ {channel}: {e}")
+        print(f"Channel {channel} error: {e}")
     await asyncio.sleep(0.5)
     return messages
 
 async def main():
-    if not API_HASH:
-        print("❌ Set TELEGRAM_API_ID & TELEGRAM_API_HASH in GitHub Secrets")
-        return
+    print(f"API_ID: {API_ID}")
+    print(f"API_HASH: {API_HASH[:10]}...")
     
-    client = Client(SESSION, API_ID, API_HASH)
+    if not API_HASH or API_ID == 0:
+        print("ERROR: Set TELEGRAM_API_ID & TELEGRAM_API_HASH")
+        return False
     
-    async with client:
-        all_events = []
-        print(f"🔄 모니터링 {len(CHANNELS)}개 채널...")
-        
-        tasks = [fetch_channel_messages(client, ch, limit=15) for ch in CHANNELS]
-        results = await asyncio.gather(*tasks)
-        
-        seen = set()
-        for msgs in results:
-            for msg in msgs:
-                text = msg["text"]
-                cat = extract_category(text)
-                if not cat:
-                    continue
-                
-                locs = extract_locations(text)
-                if not locs:
-                    continue
-                
-                for city, lat, lng in locs:
-                    event_id = f"{msg['channel']}-{round(lat,2)}-{text[:20]}"
-                    if event_id in seen:
+    try:
+        client = Client(SESSION, API_ID, API_HASH, no_updates=True)
+        async with client:
+            all_events = []
+            print(f"Monitoring {len(CHANNELS)} channels...")
+            
+            tasks = [fetch_channel_messages(client, ch, limit=15) for ch in CHANNELS]
+            results = await asyncio.gather(*tasks)
+            
+            seen = set()
+            for msgs in results:
+                for msg in msgs:
+                    text = msg["text"]
+                    cat = extract_category(text)
+                    if not cat:
                         continue
-                    seen.add(event_id)
                     
-                    keywords_hit = sum(1 for kw in KEYWORDS[cat] if kw.lower() in text.lower())
-                    impact = min(10, 5 + keywords_hit)
+                    locs = extract_locations(text)
+                    if not locs:
+                        continue
                     
-                    all_events.append({
-                        "id": event_id[:40],
-                        "title": text,
-                        "lat": lat,
-                        "lng": lng,
-                        "category": cat,
-                        "impact_score": impact,
-                        "source": msg["channel"],
-                        "ts": msg["timestamp"],
-                    })
-        
-        all_events.sort(key=lambda x: x["ts"], reverse=True)
-        all_events = all_events[:500]
-        
-        output = {
-            "updated": datetime.utcnow().isoformat(),
-            "total": len(all_events),
-            "events": all_events
-        }
-        
-        with open("docs/data.json", "w", encoding="utf-8") as f:
-            json.dump(output, f, ensure_ascii=False, indent=2)
-        
-        print(f"✅ {len(all_events)}개 이벤트 저장됨")
+                    for city, lat, lng in locs:
+                        event_id = f"{msg['channel']}-{round(lat,2)}-{text[:20]}"
+                        if event_id in seen:
+                            continue
+                        seen.add(event_id)
+                        
+                        keywords_hit = sum(1 for kw in KEYWORDS[cat] if kw.lower() in text.lower())
+                        impact = min(10, 5 + keywords_hit)
+                        
+                        all_events.append({
+                            "id": event_id[:40],
+                            "title": text,
+                            "lat": lat,
+                            "lng": lng,
+                            "category": cat,
+                            "impact_score": impact,
+                            "source": msg["channel"],
+                            "ts": msg["timestamp"],
+                        })
+            
+            all_events.sort(key=lambda x: x["ts"], reverse=True)
+            all_events = all_events[:500]
+            
+            output = {"updated": datetime.utcnow().isoformat(), "total": len(all_events), "events": all_events}
+            
+            import os
+            os.makedirs("docs", exist_ok=True)
+            with open("docs/data.json", "w", encoding="utf-8") as f:
+                json.dump(output, f, ensure_ascii=False, indent=2)
+            
+            print(f"SUCCESS: {len(all_events)} events saved")
+            return True
+            
+    except Exception as e:
+        print(f"FATAL ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    success = asyncio.run(main())
+    exit(0 if success else 1)
