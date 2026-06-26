@@ -2,29 +2,58 @@ import json, os, time, re, hashlib, urllib.request, urllib.parse, xml.etree.Elem
 from datetime import datetime
 
 FEEDS = [
+    # === 글로벌 주요 (War)
     ("https://feeds.bbci.co.uk/news/world/rss.xml","BBC","War"),
-    ("https://feeds.bbci.co.uk/news/business/rss.xml","BBC Biz","Economy"),
     ("https://rss.dw.com/rdf/rss-en-world","DW","War"),
     ("https://www.aljazeera.com/xml/rss/all.xml","AlJazeera","War"),
-    ("https://feeds.npr.org/1004/rss.xml","NPR","Politics"),
     ("https://www.theguardian.com/world/rss","Guardian","War"),
     ("https://feeds.skynews.com/feeds/rss/world.xml","SkyNews","War"),
     ("https://rss.nytimes.com/services/xml/rss/nyt/World.xml","NYT","War"),
+    ("https://moxie.foxnews.com/google-publisher/world.xml","Fox","War"),
+    ("https://feeds.a.dj.com/rss/RSSWorldNews.xml","WSJ World","War"),
+    ("https://www.cbsnews.com/latest/rss/world","CBS","War"),
+    ("https://abcnews.go.com/abcnews/internationalheadlines","ABC","War"),
+    ("https://www.france24.com/en/rss","France24","War"),
+    ("https://feeds.feedburner.com/ndtvnews-world-news","NDTV","War"),
+    ("https://www.cbc.ca/webfeed/rss/rss-world","CBC","War"),
+    ("https://www.rt.com/rss/news/","RT","War"),
+    ("https://sputnikglobe.com/export/rss2/archive/index.xml","Sputnik","War"),
+    ("https://english.kyodonews.net/rss/news.xml","Kyodo","War"),
+    ("https://www.timesofisrael.com/feed/","TimesOfIsrael","War"),
+    ("https://www.jpost.com/rss/rssfeedsheadlines.aspx","JPost","War"),
+    ("https://english.alarabiya.net/.mrss/en.xml","AlArabiya","War"),
+    ("https://www.scmp.com/rss/91/feed","SCMP","War"),
+    # === Economy
+    ("https://feeds.bbci.co.uk/news/business/rss.xml","BBC Biz","Economy"),
     ("https://www.ft.com/rss/home","FT","Economy"),
     ("https://feeds.marketwatch.com/marketwatch/topstories","MarketWatch","Economy"),
     ("https://finance.yahoo.com/news/rssindex","Yahoo","Economy"),
-    ("https://www.economist.com/international/rss.xml","Economist","Politics"),
+    ("https://www.economist.com/finance-and-economics/rss.xml","Economist Fin","Economy"),
     ("https://asia.nikkei.com/rss/feed/nar","Nikkei","Economy"),
-    ("https://moxie.foxnews.com/google-publisher/world.xml","Fox","War"),
-    ("https://feeds.a.dj.com/rss/RSSWorldNews.xml","WSJ World","War"),
     ("https://feeds.content.dowjones.io/public/rss/RSSMarketsMain","WSJ Markets","Economy"),
-    ("https://www.cbsnews.com/latest/rss/world","CBS","War"),
-    ("https://abcnews.go.com/abcnews/internationalheadlines","ABC","War"),
     ("https://www.cnbc.com/id/100727362/device/rss/rss.html","CNBC","Economy"),
-    ("https://chaski.huffpost.com/us/auto/vertical/world-news","HuffPost","Politics"),
-    ("https://www.france24.com/en/rss","France24","War"),
+    ("https://feeds.reuters.com/reuters/businessNews","Reuters Biz","Economy"),
+    ("https://www.investing.com/rss/news.rss","Investing","Economy"),
+    ("https://seekingalpha.com/feed.xml","SeekingAlpha","Economy"),
+    ("https://www.zerohedge.com/fullrss2.xml","ZeroHedge","Economy"),
+    # === Politics
+    ("https://feeds.npr.org/1014/rss.xml","NPR Politics","Politics"),
+    ("https://www.economist.com/international/rss.xml","Economist Intl","Politics"),
     ("https://feeds.feedburner.com/time/world","TIME","Politics"),
     ("https://www.cfr.org/rss.xml","CFR","Politics"),
+    ("https://foreignpolicy.com/feed/","ForeignPolicy","Politics"),
+    ("https://www.politico.com/rss/politicopicks.xml","Politico","Politics"),
+    ("https://www.euractiv.com/feed/","Euractiv","Politics"),
+    ("https://www.dailysabah.com/rssFeed/4","DailySabah","Politics"),
+    ("https://allafrica.com/tools/headlines/rdf/latest/headlines.rdf","AllAfrica","Politics"),
+    ("https://www.batimes.com.ar/feed","BuenosAires","Politics"),
+]
+
+# Reddit 공개 JSON (텔레그램 대체 실시간 소스)
+REDDIT_SUBS = [
+    ("worldnews","War"),("geopolitics","Politics"),
+    ("UkraineWarVideoReport","War"),("economics","Economy"),
+    ("CombatFootage","War"),("anime_titties","Politics"),
 ]
 
 PLACES = {
@@ -45,7 +74,7 @@ PLACES = {
     "germany":(51.1657,10.4515),"german":(51.1657,10.4515),"berlin":(52.5200,13.4050),
     "turkey":(39.9334,32.8597),"turkish":(39.9334,32.8597),"ankara":(39.9334,32.8597),"istanbul":(41.0082,28.9784),
     "syria":(34.8021,38.9968),"syrian":(34.8021,38.9968),"damascus":(33.5138,36.2765),
-    "saudi":(23.8859,45.0792),"riyadh":(24.7136,46.6753),
+    "saudi":(23.8859,45.0792),"riyadh":(24.7136,46.6753),"saudi arabia":(23.8859,45.0792),
     "india":(20.5937,78.9629),"indian":(20.5937,78.9629),"delhi":(28.6139,77.2090),"mumbai":(19.0760,72.8777),
     "pakistan":(30.3753,69.3451),"pakistani":(30.3753,69.3451),
     "venezuela":(6.4238,-66.5897),"yemen":(15.5527,48.5164),"sudan":(12.8628,30.2176),
@@ -56,6 +85,14 @@ PLACES = {
     "australia":(-25.2744,133.7751),"taiwan strait":(24.0,119.0),"south china sea":(13.0,114.0),
     "nato":(50.8503,4.3517),"eu":(50.8503,4.3517),"european union":(50.8503,4.3517),"brussels":(50.8503,4.3517),
     "pentagon":(38.8719,-77.0563),"white house":(38.8977,-77.0365),"kremlin":(55.7520,37.6175),
+    "argentina":(-38.4161,-63.6167),"nigeria":(9.0820,8.6753),"ethiopia":(9.1450,40.4897),
+    "south africa":(-30.5595,22.9375),"kenya":(-0.0236,37.9062),"libya":(26.3351,17.2283),
+    "qatar":(25.3548,51.1839),"uae":(23.4241,53.8478),"dubai":(25.2048,55.2708),
+    "philippines":(12.8797,121.7740),"indonesia":(-0.7893,113.9213),"thailand":(15.8700,100.9925),
+    "vietnam":(14.0583,108.2772),"myanmar":(21.9162,95.9560),"bangladesh":(23.6850,90.3563),
+    "greece":(39.0742,21.8243),"netherlands":(52.1326,5.2913),"sweden":(60.1282,18.6435),
+    "norway":(60.4720,8.4689),"finland":(61.9241,25.7482),"switzerland":(46.8182,8.2275),
+    "colombia":(4.5709,-74.2973),"chile":(-35.6751,-71.5430),"peru":(-9.1900,-75.0152),
 }
 
 IMPACT = {
@@ -70,7 +107,9 @@ KW = {
     "Economy":["inflation","interest rate","recession","gdp","fed","ecb","default","market","stock","trade","tariff","bank","currency","oil","commodity","crypto","economy","economic"],
     "Politics":["election","president","minister","parliament","vote","coup","resign","summit","diplomacy","treaty","nato","congress","senate","sanction"],
 }
-WEEK = 7*24*3600
+# 카테고리별 보관 기간 (초)
+RETAIN = {"War":7*24*3600, "Politics":5*24*3600, "Economy":3*24*3600}
+MAXRETAIN = 7*24*3600
 
 def mid(*p): return hashlib.sha1("|".join(str(x) for x in p).encode()).hexdigest()[:16]
 def score(t):
@@ -100,7 +139,7 @@ def fetch_rss(url,source,dc):
         req=urllib.request.Request(url,headers={"User-Agent":"Mozilla/5.0 (NewsBot/1.0)"})
         with urllib.request.urlopen(req,timeout=15) as r: raw=r.read()
         root=ET.fromstring(raw)
-        for it in [e for e in root.iter() if sns(e.tag) in ("item","entry")][:20]:
+        for it in [e for e in root.iter() if sns(e.tag) in ("item","entry")][:40]:
             title=desc=link=pub=img=""
             for ch in it:
                 tg=sns(ch.tag)
@@ -135,10 +174,33 @@ def fetch_rss(url,source,dc):
         print(f"SKIP {source}: {type(e).__name__} {e}")
     return out
 
+def fetch_reddit(sub,dc):
+    out=[]
+    try:
+        url=f"https://www.reddit.com/r/{sub}/hot.json?limit=40"
+        req=urllib.request.Request(url,headers={"User-Agent":"NewsBot/1.0 (radar)"})
+        with urllib.request.urlopen(req,timeout=15) as r: data=json.loads(r.read())
+        for c in data.get("data",{}).get("children",[]):
+            d=c.get("data",{})
+            title=d.get("title","").strip()
+            if not title: continue
+            img=""
+            pv=d.get("preview",{}).get("images",[])
+            if pv:
+                img=pv[0].get("source",{}).get("url","").replace("&amp;","&")
+            elif d.get("thumbnail","").startswith("http"):
+                img=d["thumbnail"]
+            out.append({"title":title[:200],"full":title,"pub":"","link":"https://reddit.com"+d.get("permalink",""),
+                "source":f"r/{sub}","cat":dc,"img":img,"summary":(d.get("selftext","") or "")[:280],
+                "ts":int(d.get("created_utc",time.time()))})
+    except Exception as e:
+        print(f"REDDIT {sub} fail: {type(e).__name__} {e}")
+    return out
+
 def fetch_gdelt(query, cat):
     out=[]
     try:
-        params=urllib.parse.urlencode({"query":query,"format":"GeoJSON","mode":"PointData","timespan":"3d","maxpoints":"60","sortby":"date"})
+        params=urllib.parse.urlencode({"query":query,"format":"GeoJSON","mode":"PointData","timespan":"2d","maxpoints":"150","sortby":"date"})
         url=f"https://api.gdeltproject.org/api/v2/geo/geo?{params}"
         req=urllib.request.Request(url,headers={"User-Agent":"NewsBot/1.0"})
         with urllib.request.urlopen(req,timeout=25) as r: data=json.loads(r.read())
@@ -199,12 +261,15 @@ def compute_threat(events, now):
     war=sum(1 for e in recent if e["category"]=="War" and e["impact_score"]>=7)
     eco=sum(1 for e in recent if e["category"]=="Economy" and e["impact_score"]>=8)
     s=crit*2+war+eco
-    if s>=40: lvl=1
-    elif s>=25: lvl=2
-    elif s>=12: lvl=3
-    elif s>=5: lvl=4
+    if s>=180: lvl=1
+    elif s>=120: lvl=2
+    elif s>=70: lvl=3
+    elif s>=30: lvl=4
     else: lvl=5
     return {"level":lvl,"critical_24h":crit,"war_24h":war,"eco_24h":eco,"score":s,"total_24h":len(recent)}
+
+def keep(e, now):
+    return (now-e["ts"]) <= RETAIN.get(e["category"], MAXRETAIN)
 
 def main():
     now=int(time.time())
@@ -217,14 +282,28 @@ def main():
             locs=places(it["full"])
             if not locs: continue
             cat2=category(it["full"],it["cat"]); imp=score(it["full"]); ts=parse_ts(it["pub"])
-            if now-ts>WEEK: continue
+            if now-ts>MAXRETAIN: continue
             for name,lat,lng in locs[:1]:
                 eid=mid(source,name,it["title"][:40])
                 if eid in events: continue
                 events[eid]={"id":eid,"title":it["title"],"lat":lat,"lng":lng,"category":cat2,
                     "impact_score":imp,"source":source,"url":it["link"],"place":name,"ts":ts,
                     "img":it.get("img",""),"summary":it.get("summary","")}
-        time.sleep(0.2)
+        time.sleep(0.15)
+
+    for sub,cat in REDDIT_SUBS:
+        print(f"-> Reddit r/{sub}")
+        for it in fetch_reddit(sub,cat):
+            locs=places(it["full"])
+            if not locs: continue
+            cat2=category(it["full"],it["cat"]); imp=score(it["full"]); ts=it.get("ts",now)
+            for name,lat,lng in locs[:1]:
+                eid=mid(it["source"],name,it["title"][:40])
+                if eid in events: continue
+                events[eid]={"id":eid,"title":it["title"],"lat":lat,"lng":lng,"category":cat2,
+                    "impact_score":imp,"source":it["source"],"url":it["link"],"place":name,"ts":ts,
+                    "img":it.get("img",""),"summary":it.get("summary","")}
+        time.sleep(0.3)
 
     gq={"War":'(war OR military OR strike OR missile OR invasion OR airstrike OR shelling OR offensive)',
         "Economy":'(inflation OR recession OR "central bank" OR default OR sanctions OR "stock market")',
@@ -242,9 +321,9 @@ def main():
 
     frontline=fetch_frontline()
 
-    fresh=[e for e in events.values() if now-e["ts"]<=WEEK]
+    fresh=[e for e in events.values() if keep(e,now)]
     fresh.sort(key=lambda x:x["ts"],reverse=True)
-    fresh=fresh[:2000]
+    fresh=fresh[:4000]
     threat=compute_threat(fresh,now)
 
     os.makedirs("docs",exist_ok=True)
