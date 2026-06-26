@@ -249,6 +249,26 @@ def simplify_fc(feats):
         out.append({"type":"Feature","geometry":f.get("geometry"),"properties":{"name":p.get("name","")}})
     return {"type":"FeatureCollection","features":out}
 
+def fetch_earthquakes():
+    """USGS 지진 (M4.5+, 최근 1일). 폭발/대형 사건 보조 탐지"""
+    try:
+        u="https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson"
+        req=urllib.request.Request(u,headers={"User-Agent":"NewsBot/1.0"})
+        with urllib.request.urlopen(req,timeout=20) as r: data=json.loads(r.read())
+        out=[]
+        for f in data.get("features",[]):
+            g=f.get("geometry") or {}; c=g.get("coordinates") or []; p=f.get("properties") or {}
+            if len(c)<2: continue
+            mag=p.get("mag") or 0
+            out.append({"lng":c[0],"lat":c[1],"mag":mag,"place":p.get("place","")[:80],
+                "title":f"M{mag} earthquake — {p.get('place','')}"[:160],
+                "url":p.get("url",""),"ts":int((p.get("time") or 0)/1000) or int(time.time())})
+        print(f"quakes OK: {len(out)}")
+        return out
+    except Exception as e:
+        print(f"quakes fail: {type(e).__name__} {e}")
+        return []
+
 def load_existing():
     try:
         with open("docs/data.json",encoding="utf-8") as f:
@@ -320,6 +340,7 @@ def main():
         time.sleep(0.5)
 
     frontline=fetch_frontline()
+    quakes=fetch_earthquakes()
 
     fresh=[e for e in events.values() if keep(e,now)]
     fresh.sort(key=lambda x:x["ts"],reverse=True)
@@ -329,9 +350,10 @@ def main():
     os.makedirs("docs",exist_ok=True)
     out={"updated":datetime.utcnow().isoformat(),"total":len(fresh),"threat":threat,"events":fresh}
     if frontline: out["frontline"]=frontline
+    if quakes: out["quakes"]=quakes
     with open("docs/data.json","w",encoding="utf-8") as f:
         json.dump(out,f,ensure_ascii=False)
-    print(f"DONE: {len(fresh)}건, THREAT L{threat['level']}, frontline={'Y' if frontline else 'N'}")
+    print(f"DONE: {len(fresh)}건, THREAT L{threat['level']}, frontline={'Y' if frontline else 'N'}, quakes={len(quakes)}")
 
 if __name__=="__main__":
     try: main()
