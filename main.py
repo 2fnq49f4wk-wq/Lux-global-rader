@@ -27,7 +27,6 @@ FEEDS = [
     ("https://www.cfr.org/rss.xml","CFR","Politics"),
 ]
 
-# fallback: 국가/수도 좌표 (GDELT가 못 잡을 때)
 PLACES = {
     "russia":(55.7558,37.6173),"russian":(55.7558,37.6173),"moscow":(55.7558,37.6173),
     "ukraine":(50.4501,30.5234),"ukrainian":(50.4501,30.5234),"kyiv":(50.4501,30.5234),"kiev":(50.4501,30.5234),
@@ -116,7 +115,6 @@ def fetch_rss(url,source,dc):
     return out
 
 def fetch_gdelt(query, cat):
-    """GDELT GEO API: 도시/지역 단위 정확한 좌표 자동 제공"""
     out=[]
     try:
         params=urllib.parse.urlencode({"query":query,"format":"GeoJSON","mode":"PointData","timespan":"3d","maxpoints":"60","sortby":"date"})
@@ -129,11 +127,50 @@ def fetch_gdelt(query, cat):
             lng,lat=c[0],c[1]
             name=(p.get("name") or "").split("<")[0].strip()[:160]
             if not name: continue
-            url_src=p.get("url") or p.get("shareimage") or ""
-            out.append({"title":name,"full":name,"lat":lat,"lng":lng,"place":p.get("name","").split(",")[0][:40] if p.get("name") else "","cat":cat,"link":url_src,"source":"GDELT","pub":""})
+            out.append({"title":name,"full":name,"lat":lat,"lng":lng,"place":p.get("name","").split(",")[0][:40] if p.get("name") else "","cat":cat,"link":p.get("url",""),"source":"GDELT","pub":""})
     except Exception as e:
         print(f"GDELT {cat} fail: {type(e).__name__} {e}")
     return out
+
+def fetch_frontline():
+    """DeepStateMap 우크라이나 전선 GeoJSON. 공식 API → GitHub 미러 순서로 시도"""
+    # 1) 공식 API
+    try:
+        u="https://deepstatemap.live/api/history/last/geojson"
+        req=urllib.request.Request(u,headers={"User-Agent":"deepstate-scraper/0.1"})
+        with urllib.request.urlopen(req,timeout=30) as r: data=json.loads(r.read())
+        feats=data.get("features") if isinstance(data,dict) else None
+        if feats:
+            print(f"frontline OK (official): {len(feats)} features")
+            return simplify_fc(feats)
+    except Exception as e:
+        print(f"frontline official fail: {type(e).__name__} {e}")
+    # 2) GitHub 미러 (매일 03:00 UTC 갱신, 최신 날짜 파일)
+    try:
+        idx="https://api.github.com/repos/cyterat/deepstate-map-data/contents/data"
+        req=urllib.request.Request(idx,headers={"User-Agent":"NewsBot/1.0","Accept":"application/vnd.github+json"})
+        with urllib.request.urlopen(req,timeout=20) as r: files=json.loads(r.read())
+        gj=[f for f in files if f["name"].endswith(".geojson")]
+        gj.sort(key=lambda x:x["name"])
+        latest=gj[-1]["download_url"]
+        req2=urllib.request.Request(latest,headers={"User-Agent":"NewsBot/1.0"})
+        with urllib.request.urlopen(req2,timeout=30) as r: data=json.loads(r.read())
+        feats=data.get("features",[])
+        if feats:
+            print(f"frontline OK (mirror): {len(feats)} features")
+            return simplify_fc(feats)
+    except Exception as e:
+        print(f"frontline mirror fail: {type(e).__name__} {e}")
+    return None
+
+def simplify_fc(feats):
+    """name만 남기고 좌표 보존 (용량 절감)"""
+    out=[]
+    for f in feats:
+        p=f.get("properties") or {}
+        out.append({"type":"Feature","geometry":f.get("geometry"),
+            "properties":{"name":p.get("name","")}})
+    return {"type":"FeatureCollection","features":out}
 
 def load_existing():
     try:
@@ -142,7 +179,6 @@ def load_existing():
     except: return {}
 
 def compute_threat(events, now):
-    """자체 THREAT INDEX (estimated). 최근 24h critical 밀집도로 1~5 산출. 5=가장 위험"""
     recent=[e for e in events if now-e["ts"]<=86400]
     crit=sum(1 for e in recent if e["impact_score"]>=8)
     war=sum(1 for e in recent if e["category"]=="War" and e["impact_score"]>=7)
@@ -159,7 +195,6 @@ def main():
     events=load_existing()
     print(f"기존 {len(events)}건 로드")
 
-    # 1) RSS
     for url,source,cat in FEEDS:
         print(f"-> RSS {source}")
         for it in fetch_rss(url,source,cat):
@@ -174,19 +209,20 @@ def main():
                     "impact_score":imp,"source":source,"url":it["link"],"place":name,"ts":ts}
         time.sleep(0.2)
 
-    # 2) GDELT GEO (도시 단위 정확 좌표)
     gq={"War":'(war OR military OR strike OR missile OR invasion OR airstrike OR shelling OR offensive)',
         "Economy":'(inflation OR recession OR "central bank" OR default OR sanctions OR "stock market")',
         "Politics":'(election OR coup OR summit OR sanctions OR resignation OR "no confidence")'}
     for cat,q in gq.items():
         print(f"-> GDELT {cat}")
         for it in fetch_gdelt(q,cat):
-            imp=score(it["full"]); ts=now
+            imp=score(it["full"])
             eid=mid("GDELT",round(it["lat"],3),round(it["lng"],3),it["title"][:40])
             if eid in events: continue
             events[eid]={"id":eid,"title":it["title"],"lat":it["lat"],"lng":it["lng"],"category":cat,
-                "impact_score":imp,"source":"GDELT","url":it["link"],"place":it["place"],"ts":ts}
+                "impact_score":imp,"source":"GDELT","url":it["link"],"place":it["place"],"ts":now}
         time.sleep(0.5)
+
+    frontline=fetch_frontline()
 
     fresh=[e for e in events.values() if now-e["ts"]<=WEEK]
     fresh.sort(key=lambda x:x["ts"],reverse=True)
@@ -194,9 +230,11 @@ def main():
     threat=compute_threat(fresh,now)
 
     os.makedirs("docs",exist_ok=True)
+    out={"updated":datetime.utcnow().isoformat(),"total":len(fresh),"threat":threat,"events":fresh}
+    if frontline: out["frontline"]=frontline
     with open("docs/data.json","w",encoding="utf-8") as f:
-        json.dump({"updated":datetime.utcnow().isoformat(),"total":len(fresh),"threat":threat,"events":fresh},f,ensure_ascii=False)
-    print(f"DONE: {len(fresh)}건, THREAT L{threat['level']}")
+        json.dump(out,f,ensure_ascii=False)
+    print(f"DONE: {len(fresh)}건, THREAT L{threat['level']}, frontline={'Y' if frontline else 'N'}")
 
 if __name__=="__main__":
     try: main()
