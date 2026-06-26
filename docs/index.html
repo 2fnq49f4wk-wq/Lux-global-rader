@@ -146,6 +146,11 @@
 <script>
 // ===== Cesium 초기화 (Ion 토큰 없이 ArcGIS 타일 사용) =====
 Cesium.Ion.defaultAccessToken = undefined;
+window.onerror = function(msg, url, lineNo, columnNo, error) {
+  if(msg.includes("getDerivedResources")) return true; // Cesium Ion 에러 무시
+  return false;
+};
+
 const imagery = new Cesium.ArcGisMapServerImageryProvider({
   url:"https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer"
 });
@@ -437,6 +442,7 @@ async function getRainTs(){
 }
 
 function owmProvider(layerCode,key){
+  key="ec49d2ca3a404106e31c53b2ce17db1d"; // OWM API key hardcoded
   // OWM 1.0 타일: clouds_new, temp_new, pressure_new, wind_new, precipitation_new
   return new Cesium.UrlTemplateImageryProvider({
     url:`https://tile.openweathermap.org/map/${layerCode}/{z}/{x}/{y}.png?appid=${key}`,
