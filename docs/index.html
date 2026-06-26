@@ -3,15 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Global Event Radar</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<title>Global Event Radar 3D</title>
+<script src="https://cesium.com/downloads/cesiumjs/releases/1.118/Build/Cesium/Cesium.js"></script>
+<link href="https://cesium.com/downloads/cesiumjs/releases/1.118/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+<script src="https://unpkg.com/satellite.js@5.0.0/dist/satellite.min.js"></script>
 <style>
-  :root{--bg:#0a0e14;--panel:#0f1419;--line:#1b2230;--txt:#e6edf3;--mut:#8b97a7;--war:#ff5252;--eco:#ffb300;--pol:#42a5f5;--crit:#ff1744;--mil:#00e5ff;--base:#ff9100;--quake:#e040fb}
+  :root{--bg:#0a0e14;--panel:#0f1419;--line:#1b2230;--txt:#e6edf3;--mut:#8b97a7;--war:#ff5252;--eco:#ffb300;--pol:#42a5f5;--milcat:#ff3d71;--crit:#ff1744;--mil:#00e5ff;--base:#ff9100;--quake:#e040fb;--sat:#7c4dff}
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);font:13px/1.5 system-ui,Roboto}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);font:13px/1.5 system-ui,Roboto;overflow:hidden}
   #app{display:grid;grid-template-columns:380px 1fr;height:100%;gap:1px;background:var(--line)}
   #side{background:var(--panel);display:flex;flex-direction:column;overflow:hidden}
-  #map{height:100%;background:#0a0e14}
+  #cesiumContainer{height:100%;width:100%;background:#000}
   header{padding:12px 16px;border-bottom:1px solid var(--line);flex-shrink:0}
   header h1{margin:0 0 4px;font-size:14px;letter-spacing:.5px;text-transform:uppercase}
   header .sub{font:11px monospace;color:var(--mut);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -34,34 +36,40 @@
   .chip[data-c="War"].active{border-color:var(--war);color:var(--war)}
   .chip[data-c="Economy"].active{border-color:var(--eco);color:var(--eco)}
   .chip[data-c="Politics"].active{border-color:var(--pol);color:var(--pol)}
-  .chip[data-c="mil"].active{border-color:var(--mil);color:var(--mil)}
+  .chip[data-c="Military"].active{border-color:var(--milcat);color:var(--milcat)}
   select{background:#18212d;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font:11px monospace}
+  .layers{padding:8px 16px;border-bottom:1px solid var(--line);display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0;align-items:center}
+  .lchip{cursor:pointer;user-select:none;padding:3px 8px;border:1px solid var(--line);border-radius:6px;font:11px monospace;color:var(--mut)}
+  .lchip.on{color:var(--txt);background:#18212d}
+  .lchip[data-l="front"].on{border-color:var(--war);color:var(--war)}
+  .lchip[data-l="planes"].on{border-color:var(--mil);color:var(--mil)}
+  .lchip[data-l="bases"].on{border-color:var(--base);color:var(--base)}
+  .lchip[data-l="quakes"].on{border-color:var(--quake);color:var(--quake)}
+  .lchip[data-l="sats"].on{border-color:var(--sat);color:var(--sat)}
+  .wbar{padding:8px 16px;border-bottom:1px solid var(--line);display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0;align-items:center}
+  .wbar .wlbl{font:10px monospace;color:var(--mut);width:100%;letter-spacing:1px;margin-bottom:2px}
+  .wchip{cursor:pointer;user-select:none;padding:3px 8px;border:1px solid var(--line);border-radius:6px;font:11px monospace;color:var(--mut)}
+  .wchip.on{color:var(--txt);background:#18212d;border-color:#5b7fae;color:#9ec5ff}
+  .wchip.locked{opacity:.4;cursor:not-allowed}
+  #owmkey{background:#0a0e14;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font:10px monospace;width:150px}
+  #wopacity{width:80px}
   #feed{flex:1;overflow-y:auto;font-size:12px}
   .item{padding:8px 14px;border-bottom:1px solid var(--line);cursor:pointer;border-left:3px solid transparent;display:flex;gap:8px}
   .item:hover{background:#141c27}
-  .item.War{border-left-color:var(--war)}.item.Economy{border-left-color:var(--eco)}.item.Politics{border-left-color:var(--pol)}
+  .item.War{border-left-color:var(--war)}.item.Economy{border-left-color:var(--eco)}.item.Politics{border-left-color:var(--pol)}.item.Military{border-left-color:var(--milcat)}
   .item img{width:46px;height:46px;object-fit:cover;border-radius:4px;flex-shrink:0;background:#1b2230}
   .item .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
   .item .t{font-size:12px;line-height:1.3}
   .item .m{display:flex;justify-content:space-between;align-items:center;font:10px monospace;color:var(--mut)}
   .badge{padding:1px 6px;border-radius:6px;font-weight:600}
   .b-hi{background:rgba(255,23,68,.2);color:var(--crit)}.b-md{background:rgba(255,179,0,.15);color:var(--eco)}.b-lo{background:rgba(66,165,245,.1);color:var(--pol)}
-  .leaflet-popup-content-wrapper{background:var(--panel);color:var(--txt);border-radius:8px}
-  .leaflet-popup-tip{background:var(--panel)}
-  .leaflet-popup-content{margin:0;font-size:11px;width:240px!important}
-  .pop{overflow:hidden;border-radius:8px}
-  .pop img{width:100%;height:120px;object-fit:cover;display:block;background:#1b2230}
-  .pop .pc{padding:8px 10px}
-  .pop-t{font-weight:600;margin-bottom:5px;font-size:12px;line-height:1.35}
-  .pop-s{color:#c4ccd6;font-size:11px;line-height:1.4;margin-bottom:6px}
-  .pop-m{color:var(--mut);font:10px/1.5 monospace}.pop-m a{color:var(--pol)}
-  .plane{font-size:18px;filter:drop-shadow(0 0 3px #00e5ff)}
-  .leaflet-control-layers{background:var(--panel)!important;color:var(--txt)!important;border:1px solid var(--line)!important;font:11px monospace;max-height:80vh;overflow:auto}
-  .leaflet-control-layers label{color:var(--txt)}
-  .legend{position:absolute;bottom:16px;right:16px;z-index:500;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font:10px monospace;color:var(--mut);max-height:45vh;overflow:auto}
+  .legend{position:absolute;bottom:30px;right:16px;z-index:500;background:rgba(15,20,25,.9);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font:10px monospace;color:var(--mut);max-height:45vh;overflow:auto}
   .legend span{display:flex;align-items:center;gap:6px;margin:3px 0}.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
   #status{position:absolute;top:12px;left:12px;background:rgba(0,0,0,.6);padding:6px 12px;border-radius:4px;font:11px monospace;z-index:501}
   #milstat{position:absolute;top:44px;left:12px;background:rgba(0,229,255,.12);border:1px solid var(--mil);color:var(--mil);padding:4px 10px;border-radius:4px;font:10px monospace;z-index:501;display:none}
+  #satstat{position:absolute;top:76px;left:12px;background:rgba(124,77,255,.14);border:1px solid var(--sat);color:#b39dff;padding:4px 10px;border-radius:4px;font:10px monospace;z-index:501;display:none}
+  #viewmode{position:absolute;top:12px;right:16px;z-index:501;background:rgba(15,20,25,.9);border:1px solid var(--line);border-radius:6px;padding:4px 10px;font:10px monospace;color:var(--mut)}
+  .cesium-viewer-bottom{display:none}
   @media(max-width:768px){#app{grid-template-columns:1fr;grid-template-rows:auto 60%}#side{max-height:46vh}}
 </style>
 </head>
@@ -69,7 +77,7 @@
 <div id="app">
   <div id="side">
     <header>
-      <h1>Global Radar</h1>
+      <h1>Global Radar 3D</h1>
       <div class="sub"><span id="conn" class="dot off"></span><span id="loaded">loading…</span><span id="count">0</span></div>
     </header>
     <div id="threat">
@@ -83,7 +91,7 @@
           <div class="tstat"><b id="s-eco" style="color:var(--eco)">0</b><span>ECON</span></div>
           <div class="tstat"><b id="s-tot">0</b><span>24H TOTAL</span></div>
         </div>
-        <div class="est">자체 산출 · 최근 24h 뉴스 신호 기반 · 공식 DEFCON 아님</div>
+        <div class="est">자체 산출 · 최근 24h 신호 기반 · 공식 DEFCON 아님</div>
       </div>
     </div>
     <div class="ctrls">
@@ -91,106 +99,108 @@
       <div class="chip active" data-c="War">War</div>
       <div class="chip active" data-c="Economy">Economy</div>
       <div class="chip active" data-c="Politics">Politics</div>
-      <div class="chip" data-c="mil">✈ MIL</div>
+      <div class="chip active" data-c="Military">⚔ Mil-Event</div>
       <select id="period"><option value="86400">24h</option><option value="259200">3d</option><option value="604800" selected>7d</option></select>
       <select id="minimp"><option value="0">All</option><option value="6">≥6</option><option value="8">≥8</option></select>
+    </div>
+    <div class="layers">
+      <div class="lchip on" data-l="front">🇺🇦 전선</div>
+      <div class="lchip" data-l="planes">✈ 군용기</div>
+      <div class="lchip" data-l="bases">🪖 기지</div>
+      <div class="lchip" data-l="quakes">🌐 지진</div>
+      <div class="lchip" data-l="sats">🛰 위성</div>
+    </div>
+    <div class="wbar">
+      <div class="wlbl">🌦 WEATHER LAYERS</div>
+      <div class="wchip" data-w="rain">🌧 강수/구름(레이더)</div>
+      <div class="wchip" data-w="clouds">☁ 구름</div>
+      <div class="wchip" data-w="temp">🌡 기온</div>
+      <div class="wchip" data-w="pressure">📊 기압</div>
+      <div class="wchip" data-w="wind">💨 풍속</div>
+      <div class="wchip" data-w="precip">🌦 강수량</div>
+      <input id="owmkey" placeholder="OWM API key (선택)" />
+      <input id="wopacity" type="range" min="20" max="100" value="70" title="불투명도">
     </div>
     <div id="feed"></div>
   </div>
   <div style="position:relative">
-    <div id="map"></div>
+    <div id="cesiumContainer"></div>
     <div id="status"></div>
     <div id="milstat"></div>
+    <div id="satstat"></div>
+    <div id="viewmode">3D GLOBE</div>
     <div class="legend">
       <span><i style="background:var(--war)"></i>War</span>
       <span><i style="background:var(--eco)"></i>Economy</span>
       <span><i style="background:var(--pol)"></i>Politics</span>
-      <span><i style="background:var(--crit)"></i>Critical≥8</span>
+      <span><i style="background:var(--milcat)"></i>Military event</span>
       <span><i style="background:var(--mil)"></i>Military aircraft</span>
       <span><i style="background:var(--base)"></i>Military base</span>
       <span><i style="background:var(--quake)"></i>Earthquake M4.5+</span>
-      <span><i style="background:#ff1744;opacity:.5"></i>Occupied</span>
-      <span><i style="background:#9ccc65;opacity:.6"></i>Liberated</span>
-      <span><i style="background:#888;opacity:.6"></i>Gray zone</span>
+      <span><i style="background:var(--sat)"></i>Satellite (군사/정찰)</span>
+      <span><i style="background:#4fc3f7"></i>Weather (강수/구름/기온…)</span>
     </div>
   </div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const COLOR={War:"#ff5252",Economy:"#ffb300",Politics:"#42a5f5"};
-const map=L.map("map",{preferCanvas:true,worldCopyJump:false,maxBoundsViscosity:1.0,minZoom:2,maxZoom:18}).setView([25,10],2);
-map.setMaxBounds([[-85,-180],[85,180]]);
-
-const satellite=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{noWrap:true,maxZoom:18});
-const labels=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",{noWrap:true,maxZoom:18});
-const hybrid=L.layerGroup([satellite,labels]);
-const baseLayers={
-  "Dark":L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{attribution:"© CARTO",subdomains:"abcd",noWrap:true}),
-  "Hybrid (Satellite+Labels)":hybrid,
-  "Satellite":satellite,
-  "Topographic":L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",{subdomains:"abc",noWrap:true,maxZoom:15}),
-  "OSM":L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{subdomains:"abc",noWrap:true,maxZoom:19})
-};
-baseLayers["Dark"].addTo(map);
-
-const frontlineLayer=L.layerGroup().addTo(map);
-const milLayer=L.layerGroup();
-const baseMilLayer=L.layerGroup();
-const quakeLayer=L.layerGroup();
-L.control.layers(baseLayers,{
-  "🇺🇦 Ukraine Frontline":frontlineLayer,
-  "✈ Military Aircraft (live)":milLayer,
-  "🪖 Military Bases":baseMilLayer,
-  "🌐 Earthquakes M4.5+":quakeLayer
-},{position:"topright",collapsed:false}).addTo(map);
-
-// === 주요 군사기지 (공개 정보 기반 좌표) ===
-const BASES=[
-  ["Pentagon (US DoD HQ)",38.8719,-77.0563,"🇺🇸"],
-  ["Naval Base Norfolk",36.9460,-76.3290,"🇺🇸"],
-  ["Ramstein Air Base",49.4369,7.6003,"🇩🇪"],
-  ["RAF Lakenheath",52.4093,0.5610,"🇬🇧"],
-  ["NATO HQ Brussels",50.8786,4.4239,"🇳"],
-  ["Incirlik Air Base",37.0017,35.4259,"🇹🇷"],
-  ["Al Udeid Air Base",25.1173,51.3150,"🇶🇦"],
-  ["Diego Garcia",-7.3133,72.4111,"🇬🇧"],
-  ["Guam Andersen AFB",13.5840,144.9240,"🇺🇸"],
-  ["Yokosuka Naval Base",35.2937,139.6720,"🇯🇵"],
-  ["Kadena Air Base",26.3516,127.7692,"🇯🇵"],
-  ["Camp Humphreys",36.9665,127.0309,"🇰🇷"],
-  ["Pearl Harbor",21.3645,-157.9498,"🇺🇸"],
-  ["Kaliningrad (Baltic Fleet)",54.7104,20.4522,"🇷🇺"],
-  ["Sevastopol Naval Base",44.6166,33.5254,"🇷🇺"],
-  ["Hmeimim Air Base (Syria)",35.4011,35.9486,"🇷🇺"],
-  ["Tartus Naval Base",34.8950,35.8866,"🇷🇺"],
-  ["Djibouti (multinational)",11.5471,43.1595,"🌍"],
-  ["Bagram (former)",34.9461,69.2650,"🏴"],
-  ["Guantanamo Bay",19.9061,-75.2089,"🇺🇸"],
-  ["Thule/Pituffik Space Base",76.5312,-68.7032,"🇺🇸"],
-  ["Vandenberg SFB",34.7420,-120.5724,"🇺🇸"],
-  ["Plesetsk Cosmodrome",62.9257,40.5772,"🇷🇺"],
-  ["Jiuquan (PLA)",40.9606,100.2917,"🇨🇳"],
-  ["Yulin Naval Base (Hainan)",18.2300,109.5000,"🇨"],
-  ["Djibouti PLA Support Base",11.5900,43.0650,"🇨🇳"],
-  ["Nevatim Airbase",31.2080,35.0120,"🇮🇱"],
-];
-BASES.forEach(([name,lat,lng,flag])=>{
-  L.circleMarker([lat,lng],{radius:6,color:"#fff",weight:1,fillColor:"#ff9100",fillOpacity:.9})
-    .bindPopup(`<div class="pop"><div class="pc"><div class="pop-t">${flag} ${name}</div><div class="pop-m">군사기지 · 공개정보 기준 위치</div></div></div>`)
-    .addTo(baseMilLayer);
+// ===== Cesium 초기화 (Ion 토큰 없이 ArcGIS 타일 사용) =====
+Cesium.Ion.defaultAccessToken = undefined;
+const imagery = new Cesium.ArcGisMapServerImageryProvider({
+  url:"https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer"
 });
+const viewer = new Cesium.Viewer("cesiumContainer",{
+  imageryProvider: imagery,
+  baseLayerPicker:false, geocoder:false, homeButton:false, sceneModePicker:true,
+  navigationHelpButton:false, animation:false, timeline:false, fullscreenButton:false,
+  infoBox:true, selectionIndicator:true,
+  terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+  contextOptions:{webgl:{alpha:false}}
+});
+viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString("#0a0e14");
+viewer.scene.backgroundColor = Cesium.Color.BLACK;
+viewer.imageryLayers.addImageryProvider(new Cesium.ArcGisMapServerImageryProvider({
+  url:"https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer"
+}));
+viewer.camera.setView({destination: Cesium.Cartesian3.fromDegrees(10, 25, 20000000)});
 
-let ALL=[];
-const markers=new Map();
-const active=new Set(["War","Economy","Politics"]);
+// ===== 확대→2D, 축소→3D 자동 전환 =====
+const SWITCH_ALT = 4000000;
+let curMode = "3D";
+const vm = document.getElementById("viewmode");
+function checkMode(){
+  const h = viewer.camera.positionCartographic.height;
+  if(h < SWITCH_ALT && curMode!=="2D"){
+    viewer.scene.morphTo2D(0.6); curMode="2D"; vm.textContent="2D MAP";
+  }else if(h >= SWITCH_ALT && curMode!=="3D"){
+    viewer.scene.morphTo3D(0.6); curMode="3D"; vm.textContent="3D GLOBE";
+  }
+}
+viewer.camera.percentageChanged = 0.1;
+viewer.camera.changed.addEventListener(checkMode);
+
+// ===== 색상/상수 =====
+const COLOR={War:"#ff5252",Economy:"#ffb300",Politics:"#42a5f5",Military:"#ff3d71"};
 const TCOLOR={1:"#ff1744",2:"#ff5252",3:"#ffb300",4:"#9ccc65",5:"#42a5f5"};
 const TLABEL={1:"SEVERE",2:"HIGH",3:"ELEVATED",4:"GUARDED",5:"LOW"};
-const FLAG={us:"🇺🇸",uk:"🇬🇧",ru:"🇷🇺",ua:"🇺🇦",cn:"🇨🇳",il:"🇮🇱",fr:"🇫",de:"🇩🇪",nato:"🇳🇦",tr:"🇹🇷",jp:"🇯🇵",kr:"🇰🇷",in:"🇮🇳",au:"🇦🇺",ca:"🇨🇦",pl:"🇵🇱",it:"🇮🇹",es:"🇪🇸"};
+const FLAG={us:"🇺🇸",uk:"🇬🇧",ru:"🇷🇺",ua:"🇺🇦",cn:"🇨🇳",il:"🇮🇱",fr:"🇫🇷",de:"🇩🇪",nato:"🇳🇦",tr:"🇹🇷",jp:"🇯🇵",kr:"🇰🇷",in:"🇮🇳",au:"🇦🇺",ca:"🇨🇦",pl:"🇵🇱",it:"🇮🇹",es:"🇪🇸"};
+const SATCOLOR={intel:"#ff3d71",military:"#7c4dff",radar:"#00e5ff",geo:"#ffb300","gps-ops":"#9ccc65"};
 
-function impClass(s){return s>=8?"b-hi":s>=6?"b-md":"b-lo"}
+let ALL=[];
+const active=new Set(["War","Economy","Politics","Military"]);
+
+const dsEvents = new Cesium.CustomDataSource("events");
+const dsFront  = new Cesium.CustomDataSource("front");
+const dsPlanes = new Cesium.CustomDataSource("planes");
+const dsBases  = new Cesium.CustomDataSource("bases");
+const dsQuakes = new Cesium.CustomDataSource("quakes");
+const dsSats   = new Cesium.CustomDataSource("sats");
+[dsEvents,dsFront,dsPlanes,dsBases,dsQuakes,dsSats].forEach(d=>viewer.dataSources.add(d));
+dsPlanes.show=false; dsBases.show=false; dsQuakes.show=false; dsSats.show=false;
+
 function ago(ts){const d=Date.now()/1000-ts;if(d<3600)return Math.floor(d/60)+"m";if(d<86400)return Math.floor(d/3600)+"h";return Math.floor(d/86400)+"d"}
 function esc(s){return (s||"").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+function impClass(s){return s>=8?"b-hi":s>=6?"b-md":"b-lo"}
 
 function setThreat(t){
   if(!t)return;
@@ -203,109 +213,494 @@ function setThreat(t){
   document.getElementById("s-tot").textContent=t.total_24h||0;
 }
 
-function frontStyle(n){
-  n=(n+"").toLowerCase();
-  if(/liberated|звільнен|деокуп|deoccup/.test(n)) return{color:"#9ccc65",fillColor:"#9ccc65",fillOpacity:.45,weight:1};
-  if(/gray|grey|сір|clarif|уточн/.test(n)) return{color:"#888",fillColor:"#888",fillOpacity:.4,weight:1};
-  if(/occupied|окуп|crimea|крим|ордло|cadr|calr|зайнят/.test(n)) return{color:"#ff1744",fillColor:"#ff1744",fillOpacity:.4,weight:1};
-  return{color:"#ff5252",fillColor:"#ff5252",fillOpacity:.3,weight:1};
+function descHTML(d){
+  const color=COLOR[d.category]||"#8b97a7";
+  const img=d.img?`<img src="${d.img}" style="width:100%;max-height:140px;object-fit:cover;border-radius:6px;margin-bottom:6px" onerror="this.style.display='none'">`:"";
+  const sum=d.summary?`<p style="color:#c4ccd6">${esc(d.summary)}</p>`:"";
+  const tag=d.category==="Military"?"⚔ MILITARY EVENT · ":"";
+  return `${img}${sum}<p>📍 ${esc(d.place||d.category)} · <b style="color:${color}">${d.impact_score}/10</b> · ${ago(d.ts)} ago</p><p>📡 ${esc(d.source)}${d.url?` · <a href="${d.url}" target="_blank">read more ↗</a>`:""}</p>`;
 }
-function renderFrontline(geo){
-  frontlineLayer.clearLayers();
-  try{
-    L.geoJSON(geo,{style:f=>frontStyle((f.properties&&f.properties.name)||""),
-      onEachFeature:(f,l)=>{const n=f.properties&&f.properties.name;if(n)l.bindPopup(`<div class="pop"><div class="pc"><div class="pop-m">${esc((n+"").split("///")[1]||n)}</div></div></div>`)}
-    }).addTo(frontlineLayer);
-  }catch(e){console.error(e)}
-}
-
-function renderQuakes(qs){
-  quakeLayer.clearLayers();
-  (qs||[]).forEach(q=>{
-    L.circleMarker([q.lat,q.lng],{radius:3+q.mag,color:"#e040fb",weight:1,fillColor:"#e040fb",fillOpacity:.5})
-      .bindPopup(`<div class="pop"><div class="pc"><div class="pop-t">🌐 M${q.mag} 지진</div><div class="pop-m">${esc(q.place)} · ${ago(q.ts)} ago${q.url?`<br><a href="${q.url}" target="_blank">USGS ↗</a>`:""}</div></div></div>`)
-      .addTo(quakeLayer);
-  });
-}
-
-// === 군용기 실시간 (IntelSky) ===
-const planes=new Map();let milTimer=null;
-function planeIcon(track){return L.divIcon({className:"",html:`<div class="plane" style="transform:rotate(${track||0}deg)">✈</div>`,iconSize:[20,20],iconAnchor:[10,10]});}
-async function fetchMil(){
-  if(!map.hasLayer(milLayer))return;
-  try{
-    const r=await fetch("https://intelsky.org/api/");const data=await r.json();
-    const ac=(data.ac||[]).filter(a=>a.dbFlags&&(""+a.dbFlags).length>=2&&a.lat&&a.lon);
-    const seen=new Set();
-    ac.forEach(a=>{
-      seen.add(a.hex);
-      const flag=FLAG[(""+a.dbFlags).toLowerCase()]||"🏴";
-      const fl=a.alt_baro?`FL${Math.round(a.alt_baro/100)}`:"—";
-      const pop=`<div class="pop"><div class="pc"><div class="pop-t">${flag} ${esc(a.flight||a.r||a.hex)}</div><div class="pop-s">${esc(a.desc||a.t||"Unknown type")}</div><div class="pop-m">운용: ${esc(a.ownOp||(""+a.dbFlags).toUpperCase())}<br>고도 ${fl} · 속도 ${a.gs?Math.round(a.gs)+"kt":"—"} · 침로 ${a.track?Math.round(a.track)+"°":"—"}<br>HEX ${esc(a.hex)}${a.squawk?` · SQ ${esc(a.squawk)}`:""}</div></div></div>`;
-      if(planes.has(a.hex)){const m=planes.get(a.hex);m.setLatLng([a.lat,a.lon]);m.setIcon(planeIcon(a.track));m.getPopup()&&m.setPopupContent(pop);}
-      else{const m=L.marker([a.lat,a.lon],{icon:planeIcon(a.track)}).bindPopup(pop);m.addTo(milLayer);planes.set(a.hex,m);}
-    });
-    for(const[hex,m]of planes){if(!seen.has(hex)){milLayer.removeLayer(m);planes.delete(hex);}}
-    const ms=document.getElementById("milstat");ms.style.display="block";ms.textContent=`✈ ${ac.length} military aircraft tracked`;
-  }catch(e){console.error("mil fail",e);const ms=document.getElementById("milstat");ms.style.display="block";ms.textContent="✈ aircraft feed unavailable";}
-}
-map.on("overlayadd",e=>{if(e.layer===milLayer){fetchMil();milTimer=setInterval(fetchMil,15000);document.querySelector('.chip[data-c="mil"]').classList.add("active");}});
-map.on("overlayremove",e=>{if(e.layer===milLayer){clearInterval(milTimer);planes.forEach(m=>milLayer.removeLayer(m));planes.clear();document.getElementById("milstat").style.display="none";document.querySelector('.chip[data-c="mil"]').classList.remove("active");}});
-
-function popupHTML(d){
-  const color=COLOR[d.category];
-  const img=d.img?`<img src="${d.img}" onerror="this.style.display='none'">`:"";
-  const sum=d.summary?`<div class="pop-s">${esc(d.summary)}</div>`:"";
-  return `<div class="pop">${img}<div class="pc"><div class="pop-t">${esc(d.title)}</div>${sum}<div class="pop-m">📍 ${esc(d.place||d.category)} · <b style="color:${color}">${d.impact_score}/10</b> · ${ago(d.ts)} ago<br>📡 ${esc(d.source)}${d.url?` · <a href="${d.url}" target="_blank">read more ↗</a>`:""}</div></div></div>`;
-}
-
 function filtered(){
   const period=+document.getElementById("period").value,minImp=+document.getElementById("minimp").value,now=Date.now()/1000;
   return ALL.filter(d=>active.has(d.category)&&(now-d.ts)<=period&&d.impact_score>=minImp);
 }
 function render(){
   const data=filtered();
-  markers.forEach(m=>map.removeLayer(m));markers.clear();
-  const feed=document.getElementById("feed");feed.innerHTML="";
+  dsEvents.entities.removeAll();
   document.getElementById("count").textContent=data.length+" events";
   data.forEach(d=>{
-    const color=COLOR[d.category],crit=d.impact_score>=8;
-    const m=L.circleMarker([d.lat,d.lng],{radius:4+d.impact_score*0.7,color:"#fff",weight:crit?2:1,fillColor:color,fillOpacity:0.85});
-    m.bindPopup(popupHTML(d),{maxWidth:260});m.addTo(map);markers.set(d.id,m);
+    const color=COLOR[d.category]||"#8b97a7",crit=d.impact_score>=8,milEv=d.category==="Military";
+    dsEvents.entities.add({
+      id:"ev-"+d.id,
+      position:Cesium.Cartesian3.fromDegrees(d.lng,d.lat),
+      point:{pixelSize:6+d.impact_score*0.9,
+        color:Cesium.Color.fromCssColorString(color).withAlpha(0.9),
+        outlineColor:Cesium.Color.fromCssColorString(milEv?"#ff3d71":"#ffffff"),
+        outlineWidth:crit||milEv?2:1,
+        disableDepthTestDistance:Number.POSITIVE_INFINITY},
+      name:(milEv?"⚔ ":"")+d.title,
+      description:descHTML(d)
+    });
   });
+  const feed=document.getElementById("feed");feed.innerHTML="";
   data.forEach(d=>{
     const el=document.createElement("div");el.className="item "+d.category;
     const thumb=d.img?`<img src="${d.img}" onerror="this.style.visibility='hidden'">`:`<img style="visibility:hidden">`;
     el.innerHTML=`${thumb}<div class="body"><div class="t">${esc(d.title)}</div><div class="m"><span>${esc(d.source)} · ${ago(d.ts)}</span><span class="badge ${impClass(d.impact_score)}">${d.impact_score}/10</span></div></div>`;
-    el.onclick=()=>{map.flyTo([d.lat,d.lng],6);markers.get(d.id)?.openPopup()};
+    el.onclick=()=>{
+      viewer.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(d.lng,d.lat,1500000)});
+      const e=dsEvents.entities.getById("ev-"+d.id); if(e)viewer.selectedEntity=e;
+    };
     feed.appendChild(el);
   });
 }
 
+function frontColor(n){
+  n=(n+"").toLowerCase();
+  if(/liberated|звільнен|деокуп|deoccup/.test(n)) return Cesium.Color.fromCssColorString("#9ccc65").withAlpha(.45);
+  if(/gray|grey|сір|clarif|уточн/.test(n)) return Cesium.Color.fromCssColorString("#888888").withAlpha(.4);
+  if(/occupied|окуп|crimea|крим|ордло|cadr|calr|зайнят/.test(n)) return Cesium.Color.fromCssColorString("#ff1744").withAlpha(.4);
+  return Cesium.Color.fromCssColorString("#ff5252").withAlpha(.3);
+}
+async function renderFront(geo){
+  dsFront.entities.removeAll();
+  try{
+    const tmp=await Cesium.GeoJsonDataSource.load(geo,{clampToGround:true});
+    tmp.entities.values.forEach(ent=>{
+      const nm=(ent.properties&&ent.properties.name&&ent.properties.name.getValue())||"";
+      const col=frontColor(nm);
+      if(ent.polygon){ent.polygon.material=col;ent.polygon.outline=false;}
+      if(ent.polyline){ent.polyline.material=col;ent.polyline.width=2;}
+      ent.name="전선 구역";
+      ent.description=esc((nm+"").split("///")[1]||nm);
+      dsFront.entities.add(ent);
+    });
+  }catch(e){console.error("front",e)}
+}
+
+function renderQuakes(qs){
+  dsQuakes.entities.removeAll();
+  (qs||[]).forEach(q=>{
+    dsQuakes.entities.add({
+      position:Cesium.Cartesian3.fromDegrees(q.lng,q.lat),
+      point:{pixelSize:4+q.mag*1.5,color:Cesium.Color.fromCssColorString("#e040fb").withAlpha(.6),
+        outlineColor:Cesium.Color.fromCssColorString("#e040fb"),outlineWidth:1,
+        disableDepthTestDistance:Number.POSITIVE_INFINITY},
+      name:`🌐 M${q.mag} 지진`,
+      description:`<p>${esc(q.place)} · ${ago(q.ts)} ago</p>${q.url?`<p><a href="${q.url}" target="_blank">USGS ↗</a></p>`:""}`
+    });
+  });
+}
+
+const BASES=[
+  ["Pentagon (US DoD HQ)",38.8719,-77.0563,"🇺🇸"],["Naval Base Norfolk",36.9460,-76.3290,"🇺🇸"],
+  ["Ramstein Air Base",49.4369,7.6003,"🇩🇪"],["RAF Lakenheath",52.4093,0.5610,"🇬🇧"],
+  ["NATO HQ Brussels",50.8786,4.4239,"🇳🇦"],["Incirlik Air Base",37.0017,35.4259,"🇹🇷"],
+  ["Al Udeid Air Base",25.1173,51.3150,"🇶🇦"],["Diego Garcia",-7.3133,72.4111,"🇬🇧"],
+  ["Guam Andersen AFB",13.5840,144.9240,"🇺🇸"],["Yokosuka Naval Base",35.2937,139.6720,"🇯🇵"],
+  ["Kadena Air Base",26.3516,127.7692,"🇯🇵"],["Camp Humphreys",36.9665,127.0309,"🇰🇷"],
+  ["Pearl Harbor",21.3645,-157.9498,"🇺🇸"],["Kaliningrad (Baltic Fleet)",54.7104,20.4522,"🇷🇺"],
+  ["Sevastopol Naval Base",44.6166,33.5254,"🇷🇺"],["Hmeimim Air Base (Syria)",35.4011,35.9486,"🇷🇺"],
+  ["Tartus Naval Base",34.8950,35.8866,"🇷🇺"],["Djibouti (multinational)",11.5471,43.1595,"🌍"],
+  ["Bagram (former)",34.9461,69.2650,"🏴"],["Guantanamo Bay",19.9061,-75.2089,"🇺🇸"],
+  ["Thule/Pituffik Space Base",76.5312,-68.7032,"🇺🇸"],["Vandenberg SFB",34.7420,-120.5724,"🇺🇸"],
+  ["Plesetsk Cosmodrome",62.9257,40.5772,"🇷🇺"],["Jiuquan (PLA)",40.9606,100.2917,"🇨🇳"],
+  ["Yulin Naval Base (Hainan)",18.2300,109.5000,"🇨🇳"],["Djibouti PLA Support Base",11.5900,43.0650,"🇨🇳"],
+  ["Nevatim Airbase",31.2080,35.0120,"🇮🇱"],
+];
+BASES.forEach(([name,lat,lng,flag])=>{
+  dsBases.entities.add({
+    position:Cesium.Cartesian3.fromDegrees(lng,lat),
+    point:{pixelSize:7,color:Cesium.Color.fromCssColorString("#ff9100").withAlpha(.9),
+      outlineColor:Cesium.Color.WHITE,outlineWidth:1,disableDepthTestDistance:Number.POSITIVE_INFINITY},
+    name:`${flag} ${name}`,description:"군사기지 · 공개정보 기준 위치"
+  });
+});
+
+let milTimer=null;
+async function fetchPlanes(){
+  if(!dsPlanes.show)return;
+  try{
+    const r=await fetch("https://intelsky.org/api/");const data=await r.json();
+    const ac=(data.ac||[]).filter(a=>a.dbFlags&&(""+a.dbFlags).length>=2&&a.lat&&a.lon);
+    dsPlanes.entities.removeAll();
+    ac.forEach(a=>{
+      const flag=FLAG[(""+a.dbFlags).toLowerCase()]||"🏴";
+      const fl=a.alt_baro?`FL${Math.round(a.alt_baro/100)}`:"—";
+      const alt=a.alt_baro?a.alt_baro*0.3048:8000;
+      dsPlanes.entities.add({
+        position:Cesium.Cartesian3.fromDegrees(a.lon,a.lat,alt),
+        point:{pixelSize:8,color:Cesium.Color.fromCssColorString("#00e5ff"),
+          outlineColor:Cesium.Color.BLACK,outlineWidth:1,disableDepthTestDistance:Number.POSITIVE_INFINITY},
+        name:`${flag} ${a.flight||a.r||a.hex}`,
+        description:`<p>${esc(a.desc||a.t||"Unknown type")}</p><p>운용: ${esc(a.ownOp||(""+a.dbFlags).toUpperCase())}<br>고도 ${fl} · 속도 ${a.gs?Math.round(a.gs)+"kt":"—"} · 침로 ${a.track?Math.round(a.track)+"°":"—"}<br>HEX ${esc(a.hex)}${a.squawk?` · SQ ${esc(a.squawk)}`:""}</p>`
+      });
+    });
+    const ms=document.getElementById("milstat");ms.style.display="block";ms.textContent=`✈ ${ac.length} military aircraft tracked`;
+  }catch(e){const ms=document.getElementById("milstat");ms.style.display="block";ms.textContent="✈ aircraft feed unavailable";}
+}
+
+// ===== 위성 (CelesTrak TLE → satellite.js 실시간 계산) =====
+let SATS=[];
+let satTimer=null;
+function loadSats(list){
+  SATS=[];
+  (list||[]).forEach(s=>{
+    try{
+      const rec=satellite.twoline2satrec(s.l1,s.l2);
+      SATS.push({name:s.name,group:s.group,label:s.label,satrec:rec});
+    }catch(e){}
+  });
+  const ss=document.getElementById("satstat");
+  ss.textContent=`🛰 ${SATS.length} satellites loaded`;
+}
+function updateSats(){
+  if(!dsSats.show||!SATS.length)return;
+  const now=new Date();
+  const gmst=satellite.gstime(now);
+  dsSats.entities.removeAll();
+  let ok=0;
+  SATS.forEach(s=>{
+    try{
+      const pv=satellite.propagate(s.satrec,now);
+      if(!pv.position)return;
+      const gd=satellite.eciToGeodetic(pv.position,gmst);
+      const lon=satellite.degreesLong(gd.longitude);
+      const lat=satellite.degreesLat(gd.latitude);
+      const alt=gd.height*1000;
+      const col=SATCOLOR[s.group]||"#7c4dff";
+      dsSats.entities.add({
+        position:Cesium.Cartesian3.fromDegrees(lon,lat,alt),
+        point:{pixelSize:5,color:Cesium.Color.fromCssColorString(col),
+          outlineColor:Cesium.Color.WHITE.withAlpha(.4),outlineWidth:1,
+          disableDepthTestDistance:Number.POSITIVE_INFINITY},
+        name:`🛰 ${s.name}`,
+        description:`<p>분류: ${esc(s.label)} (${esc(s.group)})</p><p>고도 ${Math.round(gd.height)} km<br>위치 ${lat.toFixed(2)}, ${lon.toFixed(2)}</p>`
+      });
+      ok++;
+    }catch(e){}
+  });
+  const ss=document.getElementById("satstat");ss.style.display="block";
+  ss.textContent=`🛰 ${ok} satellites · live`;
+}
+
+document.querySelector(".layers").addEventListener("click",e=>{
+  const c=e.target.closest(".lchip");if(!c)return;
+  const l=c.dataset.l;const on=!c.classList.contains("on");
+  c.classList.toggle("on",on);
+  if(l==="front")dsFront.show=on;
+  if(l==="bases")dsBases.show=on;
+  if(l==="quakes")dsQuakes.show=on;
+  if(l==="planes"){
+    dsPlanes.show=on;
+    if(on){fetchPlanes();milTimer=setInterval(fetchPlanes,5000);}
+    else{clearInterval(milTimer);dsPlanes.entities.removeAll();document.getElementById("milstat").style.display="none";}
+  }
+  if(l==="sats"){
+    dsSats.show=on;
+    if(on){
+      const ss=document.getElementById("satstat");ss.style.display="block";
+      if(!SATS.length){ss.textContent="🛰 위성 TLE 로딩 중…";pullSats().then(()=>{updateSats();});}
+      else updateSats();
+      satTimer=setInterval(updateSats,1000);
+    }
+    else{clearInterval(satTimer);dsSats.entities.removeAll();document.getElementById("satstat").style.display="none";}
+  }
+});
+
+// ===== 기상 레이어 =====
+// RainViewer: 키 없음 / OpenWeatherMap: 키 입력 시 활성
+const weatherLayers={};   // key -> Cesium ImageryLayer
+let rainTs=0;             // RainViewer 최신 프레임 timestamp
+const OWM_LOCK=["clouds","temp","pressure","wind","precip"];
+function owmKey(){return (document.getElementById("owmkey").value||"").trim();}
+
+function refreshLocks(){
+  const has=!!owmKey();
+  document.querySelectorAll('.wchip').forEach(c=>{
+    if(OWM_LOCK.includes(c.dataset.w)) c.classList.toggle("locked",!has);
+  });
+}
+document.getElementById("owmkey").addEventListener("input",refreshLocks);
+refreshLocks();
+
+async function getRainTs(){
+  try{
+    const r=await fetch("https://api.rainviewer.com/public/weather-maps.json");
+    const j=await r.json();
+    const past=(j.radar&&j.radar.past)||[];
+    const nowcast=(j.radar&&j.radar.nowcast)||[];
+    const frames=past.concat(nowcast);
+    if(frames.length){rainTs=frames[Math.min(past.length-1,frames.length-1)].time;return j.host;}
+  }catch(e){console.error("rainviewer",e);}
+  return null;
+}
+
+function owmProvider(layerCode,key){
+  // OWM 1.0 타일: clouds_new, temp_new, pressure_new, wind_new, precipitation_new
+  return new Cesium.UrlTemplateImageryProvider({
+    url:`https://tile.openweathermap.org/map/${layerCode}/{z}/{x}/{y}.png?appid=${key}`,
+    maximumLevel:9
+  });
+}
+
+async function addWeather(w){
+  let provider=null;
+  if(w==="rain"){
+    const host=await getRainTs();
+    if(!host||!rainTs)return null;
+    provider=new Cesium.UrlTemplateImageryProvider({
+      // /v2/radar/<ts>/<size>/{z}/{x}/{y}/<color>/<options>.png  color=4(빨강계열) 1_1=smooth+snow
+      url:`${host}/v2/radar/${rainTs}/256/{z}/{x}/{y}/4/1_1.png`,
+      maximumLevel:12
+    });
+  }else{
+    const key=owmKey();if(!key)return null;
+    const code={clouds:"clouds_new",temp:"temp_new",pressure:"pressure_new",wind:"wind_new",precip:"precipitation_new"}[w];
+    provider=owmProvider(code,key);
+  }
+  const layer=viewer.imageryLayers.addImageryProvider(provider);
+  layer.alpha=(+document.getElementById("wopacity").value)/100;
+  weatherLayers[w]=layer;
+  return layer;
+}
+function removeWeather(w){
+  if(weatherLayers[w]){viewer.imageryLayers.remove(weatherLayers[w],true);delete weatherLayers[w];}
+}
+
+document.querySelector(".wbar").addEventListener("click",async e=>{
+  const c=e.target.closest(".wchip");if(!c||c.classList.contains("locked"))return;
+  const w=c.dataset.w;const on=!c.classList.contains("on");
+  if(on){
+    const ok=await addWeather(w);
+    if(ok)c.classList.add("on");
+    else{c.classList.remove("on");setStatus(w==="rain"?"⚠ RainViewer 로드 실패":"⚠ OWM 키 필요/오류",false);}
+  }else{removeWeather(w);c.classList.remove("on");}
+});
+document.getElementById("wopacity").addEventListener("input",e=>{
+  const a=(+e.target.value)/100;
+  Object.values(weatherLayers).forEach(l=>l.alpha=a);
+});
+// RainViewer 프레임 주기적 갱신(켜져 있으면)
+setInterval(async()=>{
+  if(weatherLayers["rain"]){
+    removeWeather("rain");
+    const ok=await addWeather("rain");
+    const c=document.querySelector('.wchip[data-w="rain"]');
+    if(!ok&&c)c.classList.remove("on");
+  }
+},300000); // 5분
+
 document.querySelector(".ctrls").addEventListener("click",e=>{
   const chip=e.target.closest(".chip");if(!chip)return;const c=chip.dataset.c;
-  if(c==="mil"){if(map.hasLayer(milLayer))map.removeLayer(milLayer);else map.addLayer(milLayer);return;}
   if(c==="all"){const on=!chip.classList.contains("active");
-    document.querySelectorAll(".chip").forEach(ch=>{if(ch.dataset.c==="mil")return;ch.classList.toggle("active",on);if(ch.dataset.c!=="all")on?active.add(ch.dataset.c):active.delete(ch.dataset.c)});
+    document.querySelectorAll(".chip").forEach(ch=>{ch.classList.toggle("active",on);if(ch.dataset.c!=="all")on?active.add(ch.dataset.c):active.delete(ch.dataset.c)});
   }else{chip.classList.toggle("active");chip.classList.contains("active")?active.add(c):active.delete(c);
-    document.querySelector('.chip[data-c="all"]').classList.toggle("active",active.size===3)}
+    document.querySelector('.chip[data-c="all"]').classList.toggle("active",active.size===4)}
   render();
 });
 document.getElementById("period").onchange=render;
 document.getElementById("minimp").onchange=render;
 
 function setStatus(t,on){document.getElementById("status").textContent=t;document.getElementById("conn").className="dot "+(on?"on":"off")}
-async function load(){
-  try{
-    const r=await fetch("data.json?t="+Date.now());const d=await r.json();
-    ALL=d.events||[];setThreat(d.threat);
-    if(d.frontline)renderFrontline(d.frontline);
-    if(d.quakes)renderQuakes(d.quakes);
-    document.getElementById("loaded").textContent=d.updated?new Date(d.updated+"Z").toLocaleTimeString():"-";
-    setStatus("✓ "+ALL.length+" events",true);render();
-  }catch(e){setStatus("⚠ load failed",false);console.error(e)}
+
+// ============================================================
+// 실시간 엔진 — main.py 로직을 브라우저로 이식. 프록시 경유.
+// data.json / GitHub Actions 불필요. 페이지 열려있는 동안 직접 갱신.
+// ============================================================
+const PROXY="https://ai-traders-proxy.blauenacht08.workers.dev/?url=";
+function px(u){return PROXY+encodeURIComponent(u);}
+
+// ---- 지오코딩 사전 (main.py PLACES 축약 포팅) ----
+const PLACES={
+  "russia":[55.7558,37.6173],"russian":[55.7558,37.6173],"moscow":[55.7558,37.6173],
+  "ukraine":[50.4501,30.5234],"ukrainian":[50.4501,30.5234],"kyiv":[50.4501,30.5234],"kiev":[50.4501,30.5234],
+  "china":[39.9042,116.4074],"chinese":[39.9042,116.4074],"beijing":[39.9042,116.4074],
+  "united states":[38.8951,-77.0364],"washington":[38.8951,-77.0364],"america":[38.8951,-77.0364],"american":[38.8951,-77.0364],
+  "japan":[35.6762,139.6503],"japanese":[35.6762,139.6503],"tokyo":[35.6762,139.6503],
+  "britain":[51.5074,-0.1278],"london":[51.5074,-0.1278],"british":[51.5074,-0.1278],
+  "korea":[37.5665,126.9780],"korean":[37.5665,126.9780],"seoul":[37.5665,126.9780],
+  "north korea":[39.0194,125.7381],"pyongyang":[39.0194,125.7381],
+  "israel":[31.7683,35.2137],"israeli":[31.7683,35.2137],"jerusalem":[31.7683,35.2137],"tel aviv":[32.0853,34.7818],
+  "gaza":[31.3547,34.3088],"palestine":[31.9522,35.2332],"palestinian":[31.9522,35.2332],
+  "iran":[35.6892,51.3890],"iranian":[35.6892,51.3890],"tehran":[35.6892,51.3890],
+  "iraq":[33.3128,44.3615],"baghdad":[33.3128,44.3615],
+  "taiwan":[23.6978,120.9605],"taipei":[25.0330,121.5654],
+  "france":[46.2276,2.2137],"french":[46.2276,2.2137],"paris":[48.8566,2.3522],
+  "germany":[51.1657,10.4515],"german":[51.1657,10.4515],"berlin":[52.5200,13.4050],
+  "turkey":[39.9334,32.8597],"turkish":[39.9334,32.8597],"ankara":[39.9334,32.8597],"istanbul":[41.0082,28.9784],
+  "syria":[34.8021,38.9968],"syrian":[34.8021,38.9968],"damascus":[33.5138,36.2765],
+  "saudi":[23.8859,45.0792],"riyadh":[24.7136,46.6753],"saudi arabia":[23.8859,45.0792],
+  "india":[20.5937,78.9629],"indian":[20.5937,78.9629],"delhi":[28.6139,77.2090],"mumbai":[19.0760,72.8777],
+  "pakistan":[30.3753,69.3451],"pakistani":[30.3753,69.3451],
+  "venezuela":[6.4238,-66.5897],"yemen":[15.5527,48.5164],"sudan":[12.8628,30.2176],
+  "egypt":[26.8206,30.8025],"cairo":[30.0444,31.2357],"lebanon":[33.8547,35.8623],"beirut":[33.8938,35.5018],
+  "afghanistan":[33.9391,67.7100],"kabul":[34.5253,69.1783],
+  "poland":[51.9194,19.1451],"italy":[41.8719,12.5674],"spain":[40.4637,-3.7492],
+  "brazil":[-14.2350,-51.9253],"mexico":[23.6345,-102.5528],"canada":[56.1304,-106.3468],
+  "australia":[-25.2744,133.7751],"south china sea":[13.0,114.0],
+  "nato":[50.8503,4.3517],"european union":[50.8503,4.3517],"brussels":[50.8503,4.3517],
+  "pentagon":[38.8719,-77.0563],"white house":[38.8977,-77.0365],"kremlin":[55.7520,37.6175],
+  "argentina":[-38.4161,-63.6167],"nigeria":[9.0820,8.6753],"ethiopia":[9.1450,40.4897],
+  "south africa":[-30.5595,22.9375],"kenya":[-0.0236,37.9062],"libya":[26.3351,17.2283],
+  "qatar":[25.3548,51.1839],"uae":[23.4241,53.8478],"dubai":[25.2048,55.2708],
+  "philippines":[12.8797,121.7740],"indonesia":[-0.7893,113.9213],"thailand":[15.8700,100.9925],
+  "vietnam":[14.0583,108.2772],"myanmar":[21.9162,95.9560],"bangladesh":[23.6850,90.3563],
+  "greece":[39.0742,21.8243],"netherlands":[52.1326,5.2913],"sweden":[60.1282,18.6435],
+  "norway":[60.4720,8.4689],"finland":[61.9241,25.7482],"switzerland":[46.8182,8.2275],
+  "colombia":[4.5709,-74.2973],"chile":[-35.6751,-71.5430],"peru":[-9.1900,-75.0152]
+};
+const IMPACT={
+  10:["nuclear","world war","invasion","genocide","collapse"],
+  9:["emergency","coup","assassination","missile strike","rate hike","rate cut","default","airstrike"],
+  8:["escalation","resignation","market crash","recession","sanctions","killed","attack"],
+  7:["military","summit","election","protest","tariff","conflict","strike"],
+  6:["warning","tension","talks","inflation"]
+};
+const KW={
+  War:["war","military","strike","missile","bomb","attack","invasion","troops","combat","shelling","ceasefire","conflict","weapon","killed","casualties","drone","explosion","offensive"],
+  Economy:["inflation","interest rate","recession","gdp","fed","ecb","default","market","stock","trade","tariff","bank","currency","oil","commodity","crypto","economy","economic"],
+  Politics:["election","president","minister","parliament","vote","coup","resign","summit","diplomacy","treaty","nato","congress","senate","sanction"]
+};
+function scoreTxt(t){t=t.toLowerCase();for(const s of [10,9,8,7,6]){if(IMPACT[s].some(w=>t.includes(w)))return s;}return 5;}
+function catTxt(t,d){t=t.toLowerCase();let best=d,bc=0;for(const c in KW){const n=KW[c].filter(w=>t.includes(w)).length;if(n>bc){bc=n;best=c;}}return bc>0?best:d;}
+function placeOf(t){
+  t=" "+t.toLowerCase()+" ";
+  for(const n in PLACES){if(t.includes(" "+n+" ")||t.includes(n)){return [n.replace(/\b\w/g,c=>c.toUpperCase()),PLACES[n][0],PLACES[n][1]];}}
+  return null;
 }
-load();setInterval(load,120000);
+function hid(...p){let h=0,s=p.join("|");for(let i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0;}return "x"+h.toString(16);}
+
+const RETAIN={War:7*86400,Politics:5*86400,Economy:3*86400,Military:2*86400};
+const store=new Map(); // id -> event
+
+// ---- GDELT 실시간 ----
+async function pullGDELT(query,cat,military){
+  const u="https://api.gdeltproject.org/api/v2/geo/geo?"+new URLSearchParams({
+    query, format:"GeoJSON", mode:"PointData", timespan:"1d", maxpoints:"200", sortby:"date"});
+  try{
+    const r=await fetch(px(u));const j=await r.json();
+    (j.features||[]).forEach(f=>{
+      const c=(f.geometry||{}).coordinates||[];const p=f.properties||{};
+      if(c.length!==2)return;
+      const name=((p.name||"").split("<")[0]).trim().slice(0,160);if(!name)return;
+      const lng=c[0],lat=c[1];
+      const id=hid(military?"MIL":"GDELT",lat.toFixed(3),lng.toFixed(3),name.slice(0,40));
+      if(store.has(id))return;
+      const imp=military?Math.max(7,scoreTxt(name)):scoreTxt(name);
+      store.set(id,{id,title:name,lat,lng,category:military?"Military":cat,impact_score:imp,
+        source:military?"GDELT-MIL":"GDELT",url:p.url||"",place:(p.name||"").split(",")[0].slice(0,40),ts:Math.floor(Date.now()/1000),img:"",summary:""});
+    });
+  }catch(e){console.error("GDELT",cat,e);}
+}
+
+// ---- USGS 지진 (CORS 열림, 직접) ----
+async function pullQuakes(){
+  try{
+    const r=await fetch("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson");
+    const j=await r.json();const out=[];
+    (j.features||[]).forEach(f=>{
+      const c=(f.geometry||{}).coordinates||[];const p=f.properties||{};
+      if(c.length<2)return;const mag=p.mag||0;
+      out.push({lng:c[0],lat:c[1],mag,place:(p.place||"").slice(0,80),url:p.url||"",ts:Math.floor((p.time||Date.now())/1000)});
+    });
+    renderQuakes(out);
+  }catch(e){console.error("quakes",e);}
+}
+
+// ---- DeepStateMap 전선 (프록시) ----
+async function pullFront(){
+  try{
+    const r=await fetch(px("https://deepstatemap.live/api/history/last/geojson"));
+    const j=await r.json();
+    const feats=Array.isArray(j)?null:(j.features||null);
+    if(feats)renderFront({type:"FeatureCollection",features:feats.map(f=>({type:"Feature",geometry:f.geometry,properties:{name:(f.properties||{}).name||""}}))});
+  }catch(e){console.error("front",e);}
+}
+
+// ---- CelesTrak 위성 TLE (프록시) ----
+async function pullSats(){
+  const groups=[["intel","정찰/정보"],["military","군사"],["radar","레이더정찰"],["geo","정지궤도"],["gps-ops","GPS"]];
+  const list=[];
+  for(const [grp,label] of groups){
+    try{
+      const r=await fetch(px(`https://celestrak.org/NORAD/elements/gp.php?GROUP=${grp}&FORMAT=tle`));
+      const txt=await r.text();
+      const lines=txt.split(/\r?\n/).filter(l=>l.trim());
+      for(let i=0;i+2<lines.length;i+=3){
+        const name=lines[i].trim(),l1=lines[i+1],l2=lines[i+2];
+        if(!(l1.startsWith("1 ")&&l2.startsWith("2 ")))continue;
+        list.push({name:name.slice(0,48),l1,l2,group:grp,label});
+      }
+    }catch(e){console.error("sat",grp,e);}
+  }
+  if(list.length)loadSats(list.slice(0,900));
+}
+
+// ---- threat 계산 (main.py compute_threat 포팅) ----
+function computeThreat(){
+  const now=Date.now()/1000;
+  const recent=[...store.values()].filter(e=>now-e.ts<=86400);
+  const crit=recent.filter(e=>e.impact_score>=8).length;
+  const war=recent.filter(e=>e.category==="War"&&e.impact_score>=7).length;
+  const eco=recent.filter(e=>e.category==="Economy"&&e.impact_score>=8).length;
+  const s=crit*2+war+eco;
+  let lvl=5;if(s>=180)lvl=1;else if(s>=120)lvl=2;else if(s>=70)lvl=3;else if(s>=30)lvl=4;
+  return {level:lvl,critical_24h:crit,war_24h:war,eco_24h:eco,total_24h:recent.length};
+}
+function pruneAndPublish(){
+  const now=Date.now()/1000;
+  for(const [id,e] of store){if(now-e.ts>(RETAIN[e.category]||7*86400))store.delete(id);}
+  ALL=[...store.values()].sort((a,b)=>b.ts-a.ts).slice(0,4000);
+  setThreat(computeThreat());
+  document.getElementById("loaded").textContent=new Date().toLocaleTimeString();
+  setStatus("✓ "+ALL.length+" events · live",true);
+  render();
+}
+
+// ---- 사이클 ----
+const GQ={
+  War:'(war OR military OR strike OR missile OR invasion OR airstrike OR shelling OR offensive)',
+  Economy:'(inflation OR recession OR "central bank" OR default OR sanctions OR "stock market")',
+  Politics:'(election OR coup OR summit OR sanctions OR resignation OR "no confidence")'
+};
+const MILQ='(airstrike OR shelling OR "missile strike" OR artillery OR offensive OR "drone strike" OR clashes OR ambush OR firefight OR bombardment OR "military operation")';
+
+// Worker /events 엔드포인트 (cron이 백그라운드로 채워둠). 프록시 베이스에서 유도.
+const WORKER_BASE=PROXY.replace(/\/\?url=$/,"");
+const EVENTS_URL=WORKER_BASE+"/events";
+
+async function cycleEvents(){ // Worker가 백그라운드로 쌓은 이벤트를 받아옴
+  setStatus("⟳ syncing events…",true);
+  try{
+    const r=await fetch(EVENTS_URL+"?t="+Date.now());
+    const j=await r.json();
+    (j.events||[]).forEach(e=>{ if(!store.has(e.id)) store.set(e.id,e); });
+    pruneAndPublish();
+    if(j.updated) document.getElementById("loaded").textContent=new Date(j.updated*1000).toLocaleTimeString();
+  }catch(e){
+    // Worker /events 미설정 시 폴백: 브라우저가 직접 GDELT (프록시 경유)
+    console.warn("worker /events 불가, 직접 GDELT 폴백",e);
+    await Promise.all([
+      pullGDELT(GQ.War,"War",false),
+      pullGDELT(GQ.Economy,"Economy",false),
+      pullGDELT(GQ.Politics,"Politics",false),
+      pullGDELT(MILQ,"Military",true)
+    ]);
+    pruneAndPublish();
+  }
+}
+async function cycleGeo(){ // 전선/지진 — 5분
+  await Promise.all([pullFront(),pullQuakes()]);
+}
+// 위성 TLE는 켜져 있을 때만 1시간마다 갱신 (TLE는 하루 1~2회만 변함)
+setInterval(()=>{ if(dsSats.show) pullSats().then(()=>updateSats()); }, 3600000);
+
+// 최초 구동 — 이벤트/지오만. 위성·기상은 버튼 켤 때만.
+cycleEvents();
+cycleGeo();
+setInterval(cycleEvents,90000);   // 1.5분 (Worker가 이미 쌓아둬서 가벼움)
+setInterval(cycleGeo,300000);     // 5분
 </script>
 </body>
 </html>
