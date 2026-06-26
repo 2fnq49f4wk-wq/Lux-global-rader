@@ -17,18 +17,18 @@
   header .sub{font:11px monospace;color:var(--mut);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .dot{width:6px;height:6px;border-radius:50%;display:inline-block}
   .dot.on{background:#10b981;box-shadow:0 0 6px #10b981}.dot.off{background:#ef4444}
-  #threat{padding:10px 16px;border-bottom:1px solid var(--line);flex-shrink:0;display:flex;gap:12px;align-items:center}
-  .tcircle{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;font-weight:800;border:2px solid;flex-shrink:0}
-  .tcircle small{font:8px monospace;font-weight:400;opacity:.7}
+  /* THREAT panel (자체 평가) */
+  #threat{padding:14px 16px;border-bottom:1px solid var(--line);flex-shrink:0;display:flex;gap:14px;align-items:center;background:linear-gradient(180deg,#11161f,#0f1419)}
+  .tcircle{width:68px;height:68px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;font-weight:800;font-size:20px;border:3px solid;flex-shrink:0;letter-spacing:.5px}
+  .tcircle small{font:9px monospace;font-weight:600;opacity:.85;margin-top:2px}
   .tinfo{flex:1;min-width:0}
-  .tinfo .lbl{font:11px monospace;color:var(--mut)}
-  .tinfo .val{font-size:13px;font-weight:600;margin:1px 0}
-  .tinfo .est{font:9px monospace;color:var(--mut);opacity:.7}
-  .pizbtn{display:block;margin-top:5px;font:10px monospace;color:var(--eco);text-decoration:none;border:1px solid var(--line);border-radius:5px;padding:3px 6px;text-align:center}
-  #pizwrap{border-bottom:1px solid var(--line);flex-shrink:0;position:relative}
-  #pizframe{width:100%;height:200px;border:0;background:#000;display:none}
-  #pizfallback{padding:12px 16px;font:11px monospace;color:var(--mut);text-align:center;display:none}
-  #pizfallback a{color:var(--eco)}
+  .tinfo .lbl{font:10px monospace;color:var(--mut);letter-spacing:1px}
+  .tinfo .val{font-size:15px;font-weight:700;margin:2px 0}
+  .tstats{display:flex;gap:10px;margin-top:5px;font:10px monospace}
+  .tstat{display:flex;flex-direction:column;align-items:center;padding:3px 8px;border:1px solid var(--line);border-radius:5px;background:#0a0e14}
+  .tstat b{font-size:14px}
+  .tstat span{color:var(--mut);font-size:8px}
+  .tinfo .est{font:9px monospace;color:var(--mut);opacity:.6;margin-top:5px}
   .ctrls{padding:8px 16px;border-bottom:1px solid var(--line);display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0;align-items:center}
   .chip{cursor:pointer;user-select:none;padding:3px 8px;border:1px solid var(--line);border-radius:12px;font:11px monospace;color:var(--mut)}
   .chip.active{color:var(--txt);border-color:#3b4a5e;background:#18212d}
@@ -37,22 +37,30 @@
   .chip[data-c="Politics"].active{border-color:var(--pol);color:var(--pol)}
   select{background:#18212d;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font:11px monospace}
   #feed{flex:1;overflow-y:auto;font-size:12px}
-  .item{padding:8px 14px;border-bottom:1px solid var(--line);cursor:pointer;border-left:3px solid transparent;display:flex;flex-direction:column;gap:3px}
+  .item{padding:8px 14px;border-bottom:1px solid var(--line);cursor:pointer;border-left:3px solid transparent;display:flex;gap:8px}
   .item:hover{background:#141c27}
   .item.War{border-left-color:var(--war)}.item.Economy{border-left-color:var(--eco)}.item.Politics{border-left-color:var(--pol)}
+  .item img{width:46px;height:46px;object-fit:cover;border-radius:4px;flex-shrink:0;background:#1b2230}
+  .item .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
   .item .t{font-size:12px;line-height:1.3}
   .item .m{display:flex;justify-content:space-between;align-items:center;font:10px monospace;color:var(--mut)}
   .badge{padding:1px 6px;border-radius:6px;font-weight:600}
   .b-hi{background:rgba(255,23,68,.2);color:var(--crit)}.b-md{background:rgba(255,179,0,.15);color:var(--eco)}.b-lo{background:rgba(66,165,245,.1);color:var(--pol)}
-  .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel);color:var(--txt)}
-  .leaflet-popup-content{margin:8px 10px;font-size:11px}
-  .pop-t{font-weight:600;margin-bottom:4px}.pop-m{color:var(--mut);font:10px/1.4 monospace}.pop-m a{color:var(--pol)}
+  .leaflet-popup-content-wrapper{background:var(--panel);color:var(--txt);border-radius:8px}
+  .leaflet-popup-tip{background:var(--panel)}
+  .leaflet-popup-content{margin:0;font-size:11px;width:240px!important}
+  .pop{overflow:hidden;border-radius:8px}
+  .pop img{width:100%;height:120px;object-fit:cover;display:block;background:#1b2230}
+  .pop .pc{padding:8px 10px}
+  .pop-t{font-weight:600;margin-bottom:5px;font-size:12px;line-height:1.35}
+  .pop-s{color:#c4ccd6;font-size:11px;line-height:1.4;margin-bottom:6px}
+  .pop-m{color:var(--mut);font:10px/1.5 monospace}.pop-m a{color:var(--pol)}
   .leaflet-control-layers{background:var(--panel)!important;color:var(--txt)!important;border:1px solid var(--line)!important;font:11px monospace}
   .leaflet-control-layers label{color:var(--txt)}
   .legend{position:absolute;bottom:16px;right:16px;z-index:500;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font:10px monospace;color:var(--mut)}
   .legend span{display:flex;align-items:center;gap:6px;margin:3px 0}.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
   #status{position:absolute;top:12px;left:12px;background:rgba(0,0,0,.6);padding:6px 12px;border-radius:4px;font:11px monospace;z-index:501}
-  @media(max-width:768px){#app{grid-template-columns:1fr;grid-template-rows:auto 60%}#side{max-height:40vh}}
+  @media(max-width:768px){#app{grid-template-columns:1fr;grid-template-rows:auto 60%}#side{max-height:46vh}}
 </style>
 </head>
 <body>
@@ -65,15 +73,16 @@
     <div id="threat">
       <div id="tcircle" class="tcircle">–</div>
       <div class="tinfo">
-        <div class="lbl">THREAT INDEX</div>
+        <div class="lbl">THREAT INDEX (SELF-ASSESSED)</div>
         <div class="val" id="tval">—</div>
-        <div class="est" id="test">estimated from news signals · not official DEFCON</div>
-        <a class="pizbtn" href="https://www.pizzint.watch/" target="_blank">🍕 Pentagon Pizza Index (DOUGHCON) ↗</a>
+        <div class="tstats">
+          <div class="tstat"><b id="s-crit" style="color:var(--crit)">0</b><span>CRITICAL</span></div>
+          <div class="tstat"><b id="s-war" style="color:var(--war)">0</b><span>WAR</span></div>
+          <div class="tstat"><b id="s-eco" style="color:var(--eco)">0</b><span>ECON</span></div>
+          <div class="tstat"><b id="s-tot">0</b><span>24H TOTAL</span></div>
+        </div>
+        <div class="est">자체 산출 · 최근 24h 뉴스 신호 기반 · 공식 DEFCON 아님</div>
       </div>
-    </div>
-    <div id="pizwrap">
-      <iframe id="pizframe" src="https://www.pizzint.watch/" title="Pentagon Pizza Index"></iframe>
-      <div id="pizfallback">Pizza Index 임베드 차단됨 — <a href="https://www.pizzint.watch/" target="_blank">pizzint.watch에서 보기 ↗</a></div>
     </div>
     <div class="ctrls">
       <div class="chip active" data-c="all">ALL</div>
@@ -93,7 +102,9 @@
       <span><i style="background:var(--eco)"></i>Economy</span>
       <span><i style="background:var(--pol)"></i>Politics</span>
       <span><i style="background:var(--crit)"></i>Critical≥8</span>
-      <span><i style="background:#ff1744;opacity:.5"></i>Occupied (UA)</span>
+      <span><i style="background:#ff1744;opacity:.5"></i>Occupied</span>
+      <span><i style="background:#9ccc65;opacity:.6"></i>Liberated</span>
+      <span><i style="background:#888;opacity:.6"></i>Gray zone</span>
     </div>
   </div>
 </div>
@@ -101,14 +112,19 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const COLOR={War:"#ff5252",Economy:"#ffb300",Politics:"#42a5f5"};
-const map=L.map("map",{preferCanvas:true,worldCopyJump:false,maxBoundsViscosity:1.0,minZoom:2,maxZoom:12}).setView([25,10],2);
+const map=L.map("map",{preferCanvas:true,worldCopyJump:false,maxBoundsViscosity:1.0,minZoom:2,maxZoom:18}).setView([25,10],2);
 map.setMaxBounds([[-85,-180],[85,180]]);
+
+const satellite=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{noWrap:true,maxZoom:18});
+const labels=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",{noWrap:true,maxZoom:18});
+const hybrid=L.layerGroup([satellite,labels]);
 
 const baseLayers={
   "Dark":L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{attribution:"© CARTO",subdomains:"abcd",noWrap:true}),
-  "Satellite":L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{attribution:"© Esri",noWrap:true,maxZoom:18}),
-  "Topographic":L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",{attribution:"© OpenTopoMap",subdomains:"abc",noWrap:true,maxZoom:15}),
-  "OSM":L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap",subdomains:"abc",noWrap:true,maxZoom:19})
+  "Hybrid (Satellite+Labels)":hybrid,
+  "Satellite":satellite,
+  "Topographic":L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",{subdomains:"abc",noWrap:true,maxZoom:15}),
+  "OSM":L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{subdomains:"abc",noWrap:true,maxZoom:19})
 };
 baseLayers["Dark"].addTo(map);
 
@@ -123,27 +139,45 @@ const TLABEL={1:"SEVERE",2:"HIGH",3:"ELEVATED",4:"GUARDED",5:"LOW"};
 
 function impClass(s){return s>=8?"b-hi":s>=6?"b-md":"b-lo"}
 function ago(ts){const d=Date.now()/1000-ts;if(d<3600)return Math.floor(d/60)+"m";if(d<86400)return Math.floor(d/3600)+"h";return Math.floor(d/86400)+"d"}
+function esc(s){return (s||"").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
 
 function setThreat(t){
   if(!t)return;
   const lvl=t.level||5,c=TCOLOR[lvl],el=document.getElementById("tcircle");
-  el.style.color=c;el.style.borderColor=c;el.innerHTML=`L${lvl}<small>${TLABEL[lvl]}</small>`;
+  el.style.color=c;el.style.borderColor=c;el.innerHTML=`${lvl}<small>${TLABEL[lvl]}</small>`;
   document.getElementById("tval").textContent=`Level ${lvl} · ${TLABEL[lvl]}`;
-  document.getElementById("test").textContent=`${t.critical_24h||0} critical · ${t.war_24h||0} war events (24h) · estimated`;
+  document.getElementById("s-crit").textContent=t.critical_24h||0;
+  document.getElementById("s-war").textContent=t.war_24h||0;
+  document.getElementById("s-eco").textContent=t.eco_24h||0;
+  document.getElementById("s-tot").textContent=t.total_24h||0;
 }
 
+function frontStyle(n){
+  n=(n+"").toLowerCase();
+  if(/liberated|звільнено|deoccup/.test(n)) return{color:"#9ccc65",fillColor:"#9ccc65",fillOpacity:.45,weight:1};
+  if(/gray|grey|сіра|clarif|уточн/.test(n)) return{color:"#888",fillColor:"#888",fillOpacity:.4,weight:1};
+  if(/occupied|окуповано|crimea|крим|ордло|cadr|calr/.test(n)) return{color:"#ff1744",fillColor:"#ff1744",fillOpacity:.4,weight:1};
+  return{color:"#42a5f5",fillColor:"#42a5f5",fillOpacity:.12,weight:1};
+}
 function renderFrontline(geo){
   frontlineLayer.clearLayers();
   try{
     L.geoJSON(geo,{
-      style:f=>{
-        const n=((f.properties&&f.properties.name)||"")+"";
-        const occ=/Occupied|Окуповано|Crimea|Крим|ОРДЛО|CADR|CALR/i.test(n);
-        return{color:occ?"#ff1744":"#42a5f5",weight:1,fillColor:occ?"#ff1744":"#42a5f5",fillOpacity:occ?0.35:0.12};
-      },
-      onEachFeature:(f,l)=>{const n=f.properties&&f.properties.name;if(n)l.bindPopup(`<div class="pop-m">${(n+"").split("///")[1]||n}</div>`)}
+      style:f=>frontStyle((f.properties&&f.properties.name)||""),
+      onEachFeature:(f,l)=>{const n=f.properties&&f.properties.name;if(n)l.bindPopup(`<div class="pop"><div class="pc"><div class="pop-m">${esc((n+"").split("///")[1]||n)}</div></div></div>`)}
     }).addTo(frontlineLayer);
   }catch(e){console.error("frontline render fail",e)}
+}
+
+function popupHTML(d){
+  const color=COLOR[d.category];
+  const img=d.img?`<img src="${d.img}" onerror="this.style.display='none'">`:"";
+  const sum=d.summary?`<div class="pop-s">${esc(d.summary)}</div>`:"";
+  return `<div class="pop">${img}<div class="pc">
+    <div class="pop-t">${esc(d.title)}</div>${sum}
+    <div class="pop-m">📍 ${esc(d.place||d.category)} · <b style="color:${color}">${d.impact_score}/10</b> · ${ago(d.ts)} ago<br>
+    📡 ${esc(d.source)}${d.url?` · <a href="${d.url}" target="_blank">read more ↗</a>`:""}</div>
+  </div></div>`;
 }
 
 function filtered(){
@@ -158,13 +192,14 @@ function render(){
   data.forEach(d=>{
     const color=COLOR[d.category],crit=d.impact_score>=8;
     const m=L.circleMarker([d.lat,d.lng],{radius:4+d.impact_score*0.7,color:"#fff",weight:crit?2:1,fillColor:color,fillOpacity:0.85});
-    m.bindPopup(`<div class="pop-t">${d.title}</div><div class="pop-m">${d.place||d.category} · <b style="color:${color}">${d.impact_score}/10</b> · ${ago(d.ts)} ago<br><i>${d.source}</i>${d.url?`<br><a href="${d.url}" target="_blank">source ↗</a>`:""}</div>`);
+    m.bindPopup(popupHTML(d),{maxWidth:260});
     m.addTo(map);markers.set(d.id,m);
   });
   data.forEach(d=>{
     const el=document.createElement("div");el.className="item "+d.category;
-    el.innerHTML=`<div class="t">${d.title}</div><div class="m"><span>${d.source} · ${ago(d.ts)}</span><span class="badge ${impClass(d.impact_score)}">${d.impact_score}/10</span></div>`;
-    el.onclick=()=>{map.flyTo([d.lat,d.lng],5);markers.get(d.id)?.openPopup()};
+    const thumb=d.img?`<img src="${d.img}" onerror="this.style.visibility='hidden'">`:`<img style="visibility:hidden">`;
+    el.innerHTML=`${thumb}<div class="body"><div class="t">${esc(d.title)}</div><div class="m"><span>${esc(d.source)} · ${ago(d.ts)}</span><span class="badge ${impClass(d.impact_score)}">${d.impact_score}/10</span></div></div>`;
+    el.onclick=()=>{map.flyTo([d.lat,d.lng],6);markers.get(d.id)?.openPopup()};
     feed.appendChild(el);
   });
 }
@@ -179,13 +214,6 @@ document.querySelector(".ctrls").addEventListener("click",e=>{
 });
 document.getElementById("period").onchange=render;
 document.getElementById("minimp").onchange=render;
-
-(function(){
-  const fr=document.getElementById("pizframe"),fb=document.getElementById("pizfallback");
-  let loaded=false;
-  fr.addEventListener("load",()=>{loaded=true;fr.style.display="block";fb.style.display="none"});
-  setTimeout(()=>{if(!loaded){fr.style.display="none";fb.style.display="block"}},4000);
-})();
 
 function setStatus(t,on){document.getElementById("status").textContent=t;document.getElementById("conn").className="dot "+(on?"on":"off")}
 async function load(){
