@@ -130,6 +130,7 @@
     <div id="status"></div>
     <div id="milstat"></div>
     <div id="satstat"></div>
+    <div id="gdeltstat" style="position:absolute;top:108px;left:12px;background:rgba(255,82,82,.12);border:1px solid #ff5252;color:#ff9a9a;padding:4px 10px;border-radius:4px;font:10px monospace;z-index:501;display:none"></div>
     <div class="legend">
       <span><i style="background:var(--war)"></i>War</span>
       <span><i style="background:var(--eco)"></i>Economy</span>
@@ -278,6 +279,37 @@ const BASES=[
   ["Osan AB (Korea)",37.0906,127.0297,"🇰🇷"],["Paya Lebar (Singapore)",1.3603,103.9106,"🇸🇬"],
   // === 기타 ===
   ["HMAS Stirling (Australia)",-32.2400,115.6900,"🇦🇺"],["Pine Gap (Australia)",-23.7990,133.7370,"🇦🇺"],
+  // === 미국 추가 ===
+  ["Fort Hood",31.1349,-97.7841,"🇺🇸"],["Fort Campbell",36.6672,-87.4628,"🇺🇸"],
+  ["MacDill AFB (CENTCOM)",27.8493,-82.5210,"🇺🇸"],["Naval Base San Diego",32.6870,-117.1300,"🇺🇸"],
+  ["Whiteman AFB (B-2)",38.7300,-93.5479,"🇺🇸"],["Minot AFB (ICBM)",48.4159,-101.3306,"🇺🇸"],
+  ["Camp Pendleton",33.3856,-117.5650,"🇺🇸"],["Kings Bay (SSBN)",30.7980,-81.5170,"🇺🇸"],
+  ["Wiesbaden (US Army Europe)",50.0490,8.3250,"🇺🇸"],["Camp Casey (Korea)",37.9190,127.0560,"🇺🇸"],
+  ["Misawa AB (Japan)",40.7032,141.3686,"🇺🇸"],["Naval Station Rota",36.6230,-6.3500,"🇺🇸"],
+  // === 러시아 추가 ===
+  ["Olenya AB (bombers)",68.1517,33.4633,"🇷🇺"],["Mozdok AB",43.7850,44.6060,"🇷🇺"],
+  ["Khmeimim",35.4011,35.9486,"🇷🇺"],["Belbek AB (Crimea)",44.6890,33.5710,"🇷🇺"],
+  ["Gadzhiyevo (SSBN)",69.2530,33.3320,"🇷🇺"],["Kapustin Yar",48.5700,45.8000,"🇷🇺"],
+  // === 중국 추가 ===
+  ["Dalian Naval Base",38.8190,121.6470,"🇨🇳"],["Zhanjiang (S.Sea Fleet HQ)",21.2000,110.4000,"🇨🇳"],
+  ["Woody Island (Paracels)",16.8340,112.3430,"🇨🇳"],["Fiery Cross Reef (Spratly)",9.5490,112.8890,"🇨🇳"],
+  ["Subi Reef (Spratly)",10.9230,114.0850,"🇨🇳"],["Korla (missile test)",41.7600,86.1500,"🇨🇳"],
+  // === 인도/파키스탄 ===
+  ["INS Vishakhapatnam",17.6868,83.2185,"🇮🇳"],["Hindon AFS (India)",28.7080,77.3580,"🇮🇳"],
+  ["PNS Karachi",24.8400,66.9700,"🇵🇰"],["Sargodha AB (Pakistan)",32.0490,72.6650,"🇵🇰"],
+  // === 중동 추가 ===
+  ["Khatami AB (Iran)",32.0890,53.4000,"🇮🇷"],["Bushehr (Iran)",28.9690,50.8350,"🇮🇷"],
+  ["Hatzerim AB (Israel)",31.2330,34.6630,"🇮🇱"],["Al Dhafra AB (UAE)",24.2480,54.5470,"🇦🇪"],
+  ["Prince Sultan AB (Saudi)",24.0627,47.5805,"🇸🇦"],["Muwaffaq Salti (Jordan)",31.6830,36.7800,"🇯🇴"],
+  // === 아시아·태평양 추가 ===
+  [" Jiangnan / Changi (Singapore)",1.3500,103.9940,"🇸🇬"],["Clark AB (Philippines)",15.1860,120.5600,"🇵🇭"],
+  ["Subic Bay (Philippines)",14.7940,120.2700,"🇵🇭"],["U-Tapao (Thailand)",12.6800,101.0050,"🇹🇭"],
+  ["Cam Ranh (Vietnam)",11.9980,109.2190,"🇻🇳"],["Jeju Naval Base (Korea)",33.2280,126.5950,"🇰🇷"],
+  ["Sasebo Naval Base (Japan)",33.1590,129.7150,"🇯🇵"],["Chinhae Naval Base (Korea)",35.1450,128.6500,"🇰🇷"],
+  // === 유럽 추가 ===
+  ["Ørland AB (Norway)",63.6989,9.6040,"🇳🇴"],["Ämari AB (Estonia)",59.2603,24.2085,"🇪🇪"],
+  ["Mihail Kogălniceanu (Romania)",44.3622,28.4883,"🇷🇴"],["Łask AB (Poland)",51.5517,19.1791,"🇵🇱"],
+  ["Coningsby (Typhoon, UK)",53.0930,-0.1660,"🇬🇧"],["Istres AB (France)",43.5227,4.9239,"🇫🇷"],
 ];
 BASES.forEach(([name,lat,lng,flag])=>{
   L.circleMarker([lat,lng],{radius:5,color:"#fff",weight:1,fillColor:"#ff9100",fillOpacity:.9})
@@ -347,12 +379,15 @@ async function addWeather(w){
   let layer=null;const op=(+document.getElementById("wopacity").value)/100;
   if(w==="rain"){
     if(!(await getRainTs()))return null;
-    layer=L.tileLayer(`${rainHost}/v2/radar/${rainTs}/256/{z}/{x}/{y}/4/1_1.png`,{opacity:op,maxZoom:12,noWrap:true});
+    layer=L.tileLayer(`${rainHost}/v2/radar/${rainTs}/256/{z}/{x}/{y}/4/1_1.png`,
+      {opacity:op,maxNativeZoom:8,maxZoom:18,noWrap:true,updateWhenIdle:true,updateWhenZooming:false,keepBuffer:1});
   }else{
     const code={clouds:"clouds_new",temp:"temp_new",pressure:"pressure_new",wind:"wind_new",precip:"precipitation_new"}[w];
-    layer=L.tileLayer(`https://tile.openweathermap.org/map/${code}/{z}/{x}/{y}.png?appid=${OWM_KEY}`,{opacity:op,maxZoom:18,noWrap:true});
+    // maxNativeZoom 6: OWM 타일을 저줌까지만 받고 확대는 늘려서 부하 대폭 감소
+    layer=L.tileLayer(`https://tile.openweathermap.org/map/${code}/{z}/{x}/{y}.png?appid=${OWM_KEY}`,
+      {opacity:op,maxNativeZoom:6,maxZoom:18,noWrap:true,updateWhenIdle:true,updateWhenZooming:false,keepBuffer:1});
   }
-  layer.addTo(map);weatherLayers[w]=layer;return layer;
+  layer.addTo(map);layer.bringToBack();weatherLayers[w]=layer;return layer;
 }
 function removeWeather(w){if(weatherLayers[w]){map.removeLayer(weatherLayers[w]);delete weatherLayers[w];}}
 
@@ -464,15 +499,23 @@ const RETAIN={War:7*86400,Politics:5*86400,Economy:3*86400,Military:2*86400};
 const store=new Map(); // id -> event
 
 // ---- GDELT 실시간 ----
+let gdeltTotal=0, gdeltErr="";
+function showGdeltStat(){
+  const el=document.getElementById("gdeltstat");el.style.display="block";
+  if(gdeltErr) el.textContent="📰 GDELT 오류: "+gdeltErr;
+  else el.textContent="📰 GDELT "+gdeltTotal+"건 수신";
+}
 async function pullGDELT(query,cat,military){
   const u="https://api.gdeltproject.org/api/v2/geo/geo?"+new URLSearchParams({
-    query, format:"GeoJSON", mode:"PointData", timespan:"1d", maxpoints:"200", sortby:"date"});
+    query, format:"GeoJSON", mode:"PointData", timespan:"3d", maxpoints:"250", sortby:"date"});
   try{
-    let j;
-    try{ const r=await fetch(px(u)); j=await r.json(); }
-    catch(e){ const r=await fetch(u); j=await r.json(); }
+    let j=null;
+    // 1) 프록시 경유 시도
+    try{ const r=await fetch(px(u)); if(r.ok) j=await r.json(); }catch(e){}
+    // 2) 실패하면 직접 시도
+    if(!j||!j.features){ try{ const r=await fetch(u); if(r.ok) j=await r.json(); }catch(e){} }
     const feats=(j&&j.features)||[];
-    console.log("GDELT",cat,":",feats.length,"features");
+    gdeltTotal+=feats.length;
     feats.forEach(f=>{
       const c=(f.geometry||{}).coordinates||[];const p=f.properties||{};
       if(c.length!==2)return;
@@ -484,7 +527,8 @@ async function pullGDELT(query,cat,military){
       store.set(id,{id,title:name,lat,lng,category:military?"Military":cat,impact_score:imp,
         source:military?"GDELT-MIL":"GDELT",url:p.url||"",place:(p.name||"").split(",")[0].slice(0,40),ts:Math.floor(Date.now()/1000),img:"",summary:""});
     });
-  }catch(e){console.error("GDELT",cat,e);}
+    showGdeltStat();
+  }catch(e){ gdeltErr=(e&&e.message)||"fetch fail"; showGdeltStat(); }
 }
 
 // ---- USGS 지진 (CORS 열림, 직접) ----
@@ -593,6 +637,7 @@ const MILQ='(airstrike OR shelling OR "missile strike" OR artillery OR offensive
 const WORKER_BASE=PROXY.replace(/\/\?url=$/,"");
 const EVENTS_URL=WORKER_BASE+"/events";
 async function directGDELT(){
+  gdeltTotal=0; gdeltErr="";
   await Promise.all([
     pullGDELT(GQ.War,"War",false),
     pullGDELT(GQ.Economy,"Economy",false),
@@ -603,16 +648,13 @@ async function directGDELT(){
 }
 async function cycleEvents(){
   setStatus("⟳ syncing events…",true);
-  let got=0;
+  // Worker가 백그라운드로 쌓은 것도 받고
   try{
     const r=await fetch(EVENTS_URL+"?t="+Date.now());const j=await r.json();
     (j.events||[]).forEach(e=>{ if(!store.has(e.id)) store.set(e.id,e); });
-    got=(j.events||[]).length;
-    if(j.updated)document.getElementById("loaded").textContent=new Date(j.updated*1000).toLocaleTimeString();
   }catch(e){ console.warn("worker /events 실패",e); }
-  // Worker가 비어있거나(0건) 실패하면 브라우저가 직접 GDELT
-  if(store.size===0 || got===0){ await directGDELT(); }
-  else pruneAndPublish();
+  // 동시에 브라우저가 직접 GDELT도 긁어 화면 보장
+  await directGDELT();
 }
 async function cycleGeo(){ await Promise.all([pullFront(),pullQuakes()]); }
 setInterval(()=>{ if(map.hasLayer(satLayer)) pullSats().then(()=>updateSats()); }, 3600000);
