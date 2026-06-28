@@ -310,6 +310,30 @@ const BASES=[
   ["Ørland AB (Norway)",63.6989,9.6040,"🇳🇴"],["Ämari AB (Estonia)",59.2603,24.2085,"🇪🇪"],
   ["Mihail Kogălniceanu (Romania)",44.3622,28.4883,"🇷🇴"],["Łask AB (Poland)",51.5517,19.1791,"🇵🇱"],
   ["Coningsby (Typhoon, UK)",53.0930,-0.1660,"🇬🇧"],["Istres AB (France)",43.5227,4.9239,"🇫🇷"],
+  // === 추가 확인 기지 ===
+  ["Holloman AFB",32.8525,-106.1070,"🇺🇸"],["Tyndall AFB",30.0696,-85.5750,"🇺🇸"],
+  ["Barksdale AFB (B-52)",32.5018,-93.6627,"🇺🇸"],["Travis AFB",38.2627,-121.9270,"🇺🇸"],
+  ["Spangdahlem AB (Germany)",49.9727,6.6925,"🇺🇸"],["Naval Support Bahrain (5th Fleet)",26.2090,50.6100,"🇺🇸"],
+  ["Camp Arifjan (Kuwait)",28.8650,48.1560,"🇺🇸"],["Ali Al Salem AB (Kuwait)",29.3467,47.5208,"🇺🇸"],
+  ["Manama (Bahrain)",26.2150,50.6090,"🇧🇭"],
+  ["Akrotiri (RAF, Cyprus)",34.5904,32.9879,"🇬🇧"],["Gibraltar Naval Base",36.1408,-5.3536,"🇬🇧"],
+  ["Devesel (Aegis Ashore, Romania)",44.0890,28.1500,"🇷🇴"],["Redzikowo (Aegis, Poland)",54.4790,17.1080,"🇺🇸"],
+  ["Keflavik (Iceland)",63.9850,-22.6056,"🇮🇸"],["Evenes (Norway)",68.4913,16.6781,"🇳🇴"],
+  ["Karup AB (Denmark)",56.2975,9.1247,"🇩🇰"],["Kecskemét AB (Hungary)",46.9175,19.7492,"🇭🇺"],
+  ["Graf Ignatievo (Bulgaria)",42.2904,24.7140,"🇧🇬"],["Šiauliai AB (Lithuania)",55.8939,23.3950,"🇱🇹"],
+  ["Lielvārde AB (Latvia)",56.7775,24.8536,"🇱🇻"],
+  // === 러시아 추가 ===
+  ["Ashuluk (S-400 range)",47.5500,47.9000,"🇷🇺"],["Ramenskoye (flight test)",55.5600,38.1500,"🇷🇺"],
+  ["Saky AB (Crimea)",45.0930,33.5950,"🇷🇺"],["Dzhankoi (Crimea)",45.7100,34.4200,"🇷🇺"],
+  // === 중국 추가 ===
+  ["Mischief Reef (Spratly)",9.9000,115.5350,"🇨🇳"],["Ngari Gunsa (Tibet)",32.1000,80.0500,"🇨🇳"],
+  ["Shigatse AB (Tibet)",29.3520,89.3120,"🇨🇳"],["Hotan AB (Xinjiang)",37.0385,79.8649,"🇨🇳"],
+  // === 기타 아시아/중동 ===
+  ["Natanz (Iran nuclear)",33.7250,51.7270,"🇮🇷"],["Fordow (Iran)",34.8847,50.9947,"🇮🇷"],
+  ["Yongbyon (N.Korea nuclear)",39.7976,125.7550,"🇰🇵"],["Sunan (Pyongyang)",39.2240,125.6700,"🇰🇵"],
+  ["Taoyuan AB (Taiwan)",25.0763,121.2320,"🇹🇼"],["Tsoying Naval Base (Taiwan)",22.6300,120.2600,"🇹🇼"],
+  ["Andersen South (Guam)",13.4470,144.7320,"🇺🇸"],["Darwin (Australia)",-12.4147,130.8770,"🇦🇺"],
+  ["Tindal RAAF (Australia)",-14.5211,132.3780,"🇦🇺"],["Whenuapai (NZ)",-36.7878,174.6300,"🇳🇿"],
 ];
 BASES.forEach(([name,lat,lng,flag])=>{
   L.circleMarker([lat,lng],{radius:5,color:"#fff",weight:1,fillColor:"#ff9100",fillOpacity:.9})
@@ -319,7 +343,10 @@ BASES.forEach(([name,lat,lng,flag])=>{
 
 // ===== 군용기 실시간 =====
 const planes=new Map();let milTimer=null;
-function planeIcon(track){return L.divIcon({className:"",html:`<div class="plane" style="transform:rotate(${track||0}deg)">✈</div>`,iconSize:[18,18],iconAnchor:[9,9]});}
+function planeIcon(track){
+  const svg=`<svg width="20" height="20" viewBox="0 0 24 24" style="transform:rotate(${track||0}deg);filter:drop-shadow(0 0 2px #00e5ff)"><path fill="#00e5ff" d="M12 2 L13.2 9 L22 13 L22 15 L13.2 12.8 L13 19 L16 21 L16 22 L12 21 L8 22 L8 21 L11 19 L10.8 12.8 L2 15 L2 13 L10.8 9 Z"/></svg>`;
+  return L.divIcon({className:"",html:svg,iconSize:[20,20],iconAnchor:[10,10]});
+}
 async function fetchPlanes(){
   if(!map.hasLayer(planeLayer))return;
   try{
@@ -358,7 +385,7 @@ function updateSats(){
       const gd=satellite.eciToGeodetic(pv.position,gmst);
       const lon=satellite.degreesLong(gd.longitude),lat=satellite.degreesLat(gd.latitude);
       const col=SATCOLOR[s.group]||"#7c4dff";
-      L.marker([lat,lon],{icon:L.divIcon({className:"",html:`<div style="font-size:15px;filter:drop-shadow(0 0 3px ${col})">🛰️</div>`,iconSize:[18,18],iconAnchor:[9,9]})})
+      L.marker([lat,lon],{icon:L.divIcon({className:"",html:`<svg width="18" height="18" viewBox="0 0 24 24" style="filter:drop-shadow(0 0 2px ${col})"><g stroke="${col}" stroke-width="1.4" fill="none"><rect x="10" y="10" width="4" height="4" fill="${col}" transform="rotate(45 12 12)"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="12" y1="16" x2="12" y2="21"/><rect x="3" y="9.5" width="5" height="5" fill="${col}" opacity=".7" transform="rotate(45 5.5 12)"/><rect x="16" y="9.5" width="5" height="5" fill="${col}" opacity=".7" transform="rotate(45 18.5 12)"/></g></svg>`,iconSize:[18,18],iconAnchor:[9,9]})})
         .bindPopup(`<div class="pop"><div class="pc"><div class="pop-t">🛰 ${esc(s.name)}</div><div class="pop-m">분류: ${esc(s.label)}<br>고도 ${Math.round(gd.height)} km</div></div></div>`)
         .addTo(satLayer);
       ok++;
@@ -506,13 +533,12 @@ function showGdeltStat(){
   else el.textContent="📰 GDELT "+gdeltTotal+"건 수신";
 }
 async function pullGDELT(query,cat,military){
+  // GEO 2.0 API: sortby 없음, timespan은 시간 단위로. maxpoints는 그대로.
   const u="https://api.gdeltproject.org/api/v2/geo/geo?"+new URLSearchParams({
-    query, format:"GeoJSON", mode:"PointData", timespan:"3d", maxpoints:"250", sortby:"date"});
+    query, format:"GeoJSON", mode:"PointData", timespan:"72h", maxpoints:"250"});
   try{
     let j=null;
-    // 1) 프록시 경유 시도
     try{ const r=await fetch(px(u)); if(r.ok) j=await r.json(); }catch(e){}
-    // 2) 실패하면 직접 시도
     if(!j||!j.features){ try{ const r=await fetch(u); if(r.ok) j=await r.json(); }catch(e){} }
     const feats=(j&&j.features)||[];
     gdeltTotal+=feats.length;
