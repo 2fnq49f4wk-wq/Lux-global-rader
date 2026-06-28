@@ -242,21 +242,45 @@ function renderQuakes(qs){
 
 // ===== 군사기지 =====
 const BASES=[
+  // === 미국 본토 ===
   ["Pentagon",38.8719,-77.0563,"🇺🇸"],["Naval Base Norfolk",36.9460,-76.3290,"🇺🇸"],
-  ["Ramstein Air Base",49.4369,7.6003,"🇩🇪"],["RAF Lakenheath",52.4093,0.5610,"🇬🇧"],
-  ["NATO HQ Brussels",50.8786,4.4239,"🇳🇦"],["Incirlik Air Base",37.0017,35.4259,"🇹🇷"],
-  ["Al Udeid Air Base",25.1173,51.3150,"🇶🇦"],["Diego Garcia",-7.3133,72.4111,"🇬🇧"],
-  ["Guam Andersen AFB",13.5840,144.9240,"🇺🇸"],["Yokosuka Naval Base",35.2937,139.6720,"🇯🇵"],
-  ["Kadena Air Base",26.3516,127.7692,"🇯🇵"],["Camp Humphreys",36.9665,127.0309,"🇰🇷"],
-  ["Pearl Harbor",21.3645,-157.9498,"🇺🇸"],["Kaliningrad",54.7104,20.4522,"🇷🇺"],
-  ["Sevastopol Naval Base",44.6166,33.5254,"🇷🇺"],["Hmeimim (Syria)",35.4011,35.9486,"🇷🇺"],
-  ["Tartus Naval Base",34.8950,35.8866,"🇷🇺"],["Djibouti",11.5471,43.1595,"🌍"],
-  ["Guantanamo Bay",19.9061,-75.2089,"🇺🇸"],["Vandenberg SFB",34.7420,-120.5724,"🇺🇸"],
-  ["Plesetsk Cosmodrome",62.9257,40.5772,"🇷🇺"],["Jiuquan (PLA)",40.9606,100.2917,"🇨🇳"],
-  ["Yulin (Hainan)",18.2300,109.5000,"🇨🇳"],["Nevatim Airbase",31.2080,35.0120,"🇮🇱"],
+  ["Pearl Harbor",21.3645,-157.9498,"🇺🇸"],["Vandenberg SFB",34.7420,-120.5724,"🇺🇸"],
+  ["Fort Bragg",35.1410,-79.0060,"🇺🇸"],["Edwards AFB",34.9054,-117.8835,"🇺🇸"],
+  ["Nellis AFB",36.2360,-115.0340,"🇺🇸"],["Wright-Patterson AFB",39.8138,-84.0490,"🇺🇸"],
+  ["Cheyenne Mountain (NORAD)",38.7440,-104.8460,"🇺🇸"],["Guantanamo Bay",19.9061,-75.2089,"🇺🇸"],
+  // === 미국 해외 ===
+  ["Ramstein Air Base",49.4369,7.6003,"🇺🇸"],["RAF Lakenheath",52.4093,0.5610,"🇺🇸"],
+  ["Incirlik Air Base",37.0017,35.4259,"🇺🇸"],["Al Udeid Air Base",25.1173,51.3150,"🇺🇸"],
+  ["Diego Garcia",-7.3133,72.4111,"🇺🇸"],["Guam Andersen AFB",13.5840,144.9240,"🇺🇸"],
+  ["Yokosuka Naval Base",35.2937,139.6720,"🇺🇸"],["Kadena Air Base",26.3516,127.7692,"🇺🇸"],
+  ["Camp Humphreys",36.9665,127.0309,"🇺🇸"],["Aviano Air Base",46.0319,12.5965,"🇺🇸"],
+  ["Rota Naval Station",36.6453,-6.3494,"🇺🇸"],["Thule/Pituffik",76.5312,-68.7032,"🇺🇸"],
+  ["Camp Lemonnier (Djibouti)",11.5471,43.1595,"🇺🇸"],
+  // === 러시아 ===
+  ["Kaliningrad (Baltic Fleet)",54.7104,20.4522,"🇷🇺"],["Sevastopol Naval Base",44.6166,33.5254,"🇷🇺"],
+  ["Hmeimim AB (Syria)",35.4011,35.9486,"🇷🇺"],["Tartus Naval Base (Syria)",34.8950,35.8866,"🇷🇺"],
+  ["Plesetsk Cosmodrome",62.9257,40.5772,"🇷🇺"],["Severomorsk (Northern Fleet)",69.0742,33.4168,"🇷🇺"],
+  ["Vladivostok (Pacific Fleet)",43.1056,131.8735,"🇷🇺"],["Engels-2 AB",51.4800,46.2100,"🇷🇺"],
+  ["Baikonur Cosmodrome",45.9650,63.3050,"🇷🇺"],
+  // === 중국 ===
+  ["Yulin Naval Base (Hainan)",18.2300,109.5000,"🇨🇳"],["Jiuquan (PLA)",40.9606,100.2917,"🇨🇳"],
+  ["Qingdao Naval Base",36.0671,120.3826,"🇨🇳"],["Djibouti PLA Base",11.5900,43.0650,"🇨🇳"],
+  ["Xichang Space Center",28.2460,102.0270,"🇨🇳"],["Ngari (Tibet)",32.1000,80.0500,"🇨🇳"],
+  // === NATO/유럽 ===
+  ["NATO HQ Brussels",50.8786,4.4239,"🇳🇦"],["RAF Brize Norton",51.7500,-1.5836,"🇬🇧"],
+  ["Faslane (Trident)",56.0640,-4.8190,"🇬🇧"],["Mont-de-Marsan AB",43.9117,-0.5067,"🇫🇷"],
+  ["Toulon Naval Base",43.1040,5.8990,"🇫🇷"],["Büchel AB",50.1739,7.0633,"🇩🇪"],
+  ["Souda Bay (Greece)",35.5310,24.1490,"🇬🇷"],["Sigonella (Italy)",37.4017,14.9224,"🇮🇹"],
+  // === 중동/아시아 ===
+  ["Nevatim AB (Israel)",31.2080,35.0120,"🇮🇱"],["Bandar Abbas (Iran)",27.1833,56.2667,"🇮🇷"],
+  ["King Abdulaziz AB (Saudi)",26.2650,50.1520,"🇸🇦"],["INS Kadamba (India)",14.8500,74.1500,"🇮🇳"],
+  ["Hmeimim",35.4011,35.9486,"🇸🇾"],["Yokota AB (Japan)",35.7485,139.3485,"🇯🇵"],
+  ["Osan AB (Korea)",37.0906,127.0297,"🇰🇷"],["Paya Lebar (Singapore)",1.3603,103.9106,"🇸🇬"],
+  // === 기타 ===
+  ["HMAS Stirling (Australia)",-32.2400,115.6900,"🇦🇺"],["Pine Gap (Australia)",-23.7990,133.7370,"🇦🇺"],
 ];
 BASES.forEach(([name,lat,lng,flag])=>{
-  L.circleMarker([lat,lng],{radius:6,color:"#fff",weight:1,fillColor:"#ff9100",fillOpacity:.9})
+  L.circleMarker([lat,lng],{radius:5,color:"#fff",weight:1,fillColor:"#ff9100",fillOpacity:.9})
     .bindPopup(`<div class="pop"><div class="pc"><div class="pop-t">${flag} ${name}</div><div class="pop-m">군사기지 · 공개정보</div></div></div>`)
     .addTo(baseLayer);
 });
@@ -267,7 +291,9 @@ function planeIcon(track){return L.divIcon({className:"",html:`<div class="plane
 async function fetchPlanes(){
   if(!map.hasLayer(planeLayer))return;
   try{
-    const r=await fetch("https://intelsky.org/api/");const data=await r.json();
+    let data;
+    try{ const r=await fetch("https://intelsky.org/api/"); data=await r.json(); }
+    catch(e){ const r=await fetch(px("https://intelsky.org/api/")); data=await r.json(); }
     const ac=(data.ac||[]).filter(a=>a.dbFlags&&(""+a.dbFlags).length>=2&&a.lat&&a.lon);
     const seen=new Set();
     ac.forEach(a=>{
@@ -300,7 +326,7 @@ function updateSats(){
       const gd=satellite.eciToGeodetic(pv.position,gmst);
       const lon=satellite.degreesLong(gd.longitude),lat=satellite.degreesLat(gd.latitude);
       const col=SATCOLOR[s.group]||"#7c4dff";
-      L.circleMarker([lat,lon],{radius:3,color:col,weight:1,fillColor:col,fillOpacity:.8})
+      L.marker([lat,lon],{icon:L.divIcon({className:"",html:`<div style="font-size:15px;filter:drop-shadow(0 0 3px ${col})">🛰️</div>`,iconSize:[18,18],iconAnchor:[9,9]})})
         .bindPopup(`<div class="pop"><div class="pc"><div class="pop-t">🛰 ${esc(s.name)}</div><div class="pop-m">분류: ${esc(s.label)}<br>고도 ${Math.round(gd.height)} km</div></div></div>`)
         .addTo(satLayer);
       ok++;
@@ -442,8 +468,12 @@ async function pullGDELT(query,cat,military){
   const u="https://api.gdeltproject.org/api/v2/geo/geo?"+new URLSearchParams({
     query, format:"GeoJSON", mode:"PointData", timespan:"1d", maxpoints:"200", sortby:"date"});
   try{
-    const r=await fetch(px(u));const j=await r.json();
-    (j.features||[]).forEach(f=>{
+    let j;
+    try{ const r=await fetch(px(u)); j=await r.json(); }
+    catch(e){ const r=await fetch(u); j=await r.json(); }
+    const feats=(j&&j.features)||[];
+    console.log("GDELT",cat,":",feats.length,"features");
+    feats.forEach(f=>{
       const c=(f.geometry||{}).coordinates||[];const p=f.properties||{};
       if(c.length!==2)return;
       const name=((p.name||"").split("<")[0]).trim().slice(0,160);if(!name)return;
