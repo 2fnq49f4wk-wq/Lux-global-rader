@@ -5,108 +5,164 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Global Event Radar</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://unpkg.com/satellite.js@5.0.0/dist/satellite.min.js"></script>
 <style>
-  :root{--bg:#0a0e14;--panel:#0f1419;--line:#1b2230;--txt:#e6edf3;--mut:#8b97a7;--war:#ff5252;--eco:#ffb300;--pol:#42a5f5;--milcat:#ff3d71;--crit:#ff1744;--mil:#00e5ff;--base:#ff9100;--quake:#e040fb;--sat:#7c4dff}
+  :root{
+    --bg:#070b12;--panel:#0a1019;--panel2:#0c1420;--line:#16202e;--line2:#1d2a3a;
+    --txt:#dde7f0;--mut:#6b7d92;--mut2:#46566a;
+    --cyan:#4ddbff;--amber:#ffb454;--red:#ff3b5c;
+    --war:#ff5b6e;--eco:#ffb454;--pol:#4d9fff;--milcat:#ff4d8d;--crit:#ff3b5c;
+    --mil:#4ddbff;--base:#ff9f40;--quake:#c77dff;--sat:#9d8cff;
+    --glow:0 0 12px;
+  }
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);font:13px/1.5 system-ui,Roboto}
-  #app{display:grid;grid-template-columns:380px 1fr;height:100%;gap:1px;background:var(--line)}
-  #side{background:var(--panel);display:flex;flex-direction:column;overflow:hidden}
-  #map{height:100%;background:#0a0e14}
-  header{padding:12px 16px;border-bottom:1px solid var(--line);flex-shrink:0}
-  header h1{margin:0 0 4px;font-size:14px;letter-spacing:.5px;text-transform:uppercase}
-  header .sub{font:11px monospace;color:var(--mut);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--txt);
+    font:13px/1.5 ui-monospace,"SF Mono","JetBrains Mono",monospace;-webkit-font-smoothing:antialiased}
+  /* 배경 그리드 */
+  body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.4;
+    background-image:linear-gradient(rgba(77,219,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(77,219,255,.03) 1px,transparent 1px);
+    background-size:40px 40px}
+  #app{position:relative;z-index:1;display:grid;grid-template-columns:392px 1fr;height:100%;gap:1px;background:var(--line)}
+  #side{background:var(--panel);display:flex;flex-direction:column;overflow:hidden;position:relative}
+  #side::after{content:"";position:absolute;top:0;right:0;width:1px;height:100%;background:linear-gradient(180deg,transparent,var(--cyan),transparent);opacity:.25}
+  #map{height:100%;background:#060a10}
+
+  /* ── 헤더 ── */
+  header{padding:14px 18px 12px;border-bottom:1px solid var(--line);flex-shrink:0;position:relative;
+    background:linear-gradient(180deg,#0b1422,#0a1019)}
+  header h1{margin:0;font-size:15px;font-weight:700;letter-spacing:3px;text-transform:uppercase;
+    display:flex;align-items:center;gap:9px;color:#fff}
+  header h1::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--cyan);
+    box-shadow:var(--glow) var(--cyan);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  header .sub{margin-top:7px;font-size:10px;color:var(--mut);display:flex;gap:10px;align-items:center;flex-wrap:wrap;letter-spacing:.5px}
   .dot{width:6px;height:6px;border-radius:50%;display:inline-block}
-  .dot.on{background:#10b981;box-shadow:0 0 6px #10b981}.dot.off{background:#ef4444}
-  #threat{padding:14px 16px;border-bottom:1px solid var(--line);flex-shrink:0;display:flex;gap:14px;align-items:center;background:linear-gradient(180deg,#11161f,#0f1419)}
-  .tcircle{width:68px;height:68px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-direction:column;font-weight:800;font-size:20px;border:3px solid;flex-shrink:0;letter-spacing:.5px}
-  .tcircle small{font:9px monospace;font-weight:600;opacity:.85;margin-top:2px}
+  .dot.on{background:#2ce69b;box-shadow:0 0 7px #2ce69b}.dot.off{background:var(--red)}
+
+  /* ── 위협 게이지 (시그니처) ── */
+  #threat{padding:16px 18px;border-bottom:1px solid var(--line);flex-shrink:0;display:flex;gap:16px;align-items:center;
+    background:radial-gradient(120% 100% at 0% 0%,#0d1726,#0a1019)}
+  .tcircle{position:relative;width:76px;height:76px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;font-weight:800;font-size:23px;border:2px solid;flex-shrink:0;letter-spacing:.5px;
+    background:radial-gradient(circle,rgba(0,0,0,.4),transparent)}
+  .tcircle::before{content:"";position:absolute;inset:-6px;border-radius:50%;border:1px solid currentColor;opacity:.25}
+  .tcircle::after{content:"";position:absolute;inset:-6px;border-radius:50%;
+    background:conic-gradient(from 0deg,currentColor,transparent 75%);opacity:.12;animation:sweep 4s linear infinite}
+  @keyframes sweep{to{transform:rotate(360deg)}}
+  .tcircle small{font-size:8px;font-weight:700;opacity:.8;margin-top:1px;letter-spacing:1px}
   .tinfo{flex:1;min-width:0}
-  .tinfo .lbl{font:10px monospace;color:var(--mut);letter-spacing:1px}
-  .tinfo .val{font-size:15px;font-weight:700;margin:2px 0}
-  .tstats{display:flex;gap:10px;margin-top:5px;font:10px monospace}
-  .tstat{display:flex;flex-direction:column;align-items:center;padding:3px 8px;border:1px solid var(--line);border-radius:5px;background:#0a0e14}
-  .tstat b{font-size:14px}.tstat span{color:var(--mut);font-size:8px}
-  .tinfo .est{font:9px monospace;color:var(--mut);opacity:.6;margin-top:5px}
-  .ctrls{padding:8px 16px;border-bottom:1px solid var(--line);display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0;align-items:center}
-  .chip{cursor:pointer;user-select:none;padding:3px 8px;border:1px solid var(--line);border-radius:12px;font:11px monospace;color:var(--mut)}
-  .chip.active{color:var(--txt);border-color:#3b4a5e;background:#18212d}
-  .chip[data-c="War"].active{border-color:var(--war);color:var(--war)}
-  .chip[data-c="Economy"].active{border-color:var(--eco);color:var(--eco)}
-  .chip[data-c="Politics"].active{border-color:var(--pol);color:var(--pol)}
-  .chip[data-c="Military"].active{border-color:var(--milcat);color:var(--milcat)}
-  select{background:#18212d;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:3px 6px;font:11px monospace}
-  .layers,.wbar{padding:8px 16px;border-bottom:1px solid var(--line);display:flex;gap:4px;flex-wrap:wrap;flex-shrink:0;align-items:center}
-  .wbar .wlbl{font:10px monospace;color:var(--mut);width:100%;letter-spacing:1px;margin-bottom:2px}
-  .lchip,.wchip{cursor:pointer;user-select:none;padding:3px 8px;border:1px solid var(--line);border-radius:6px;font:11px monospace;color:var(--mut)}
-  .lchip.on,.wchip.on{color:var(--txt);background:#18212d}
+  .tinfo .lbl{font-size:9px;color:var(--mut);letter-spacing:2px;text-transform:uppercase}
+  .tinfo .val{font-size:16px;font-weight:700;margin:3px 0;letter-spacing:1px}
+  .tstats{display:flex;gap:7px;margin-top:7px}
+  .tstat{display:flex;flex-direction:column;align-items:center;padding:4px 9px;border:1px solid var(--line2);border-radius:4px;
+    background:rgba(0,0,0,.3);min-width:42px}
+  .tstat b{font-size:15px;font-weight:700}.tstat span{color:var(--mut);font-size:7px;letter-spacing:1px;text-transform:uppercase;margin-top:1px}
+  .tinfo .est{font-size:9px;color:var(--mut2);margin-top:6px;letter-spacing:.5px}
+
+  /* ── 컨트롤 행 ── */
+  .ctrls,.layers,.wbar{padding:9px 18px;border-bottom:1px solid var(--line);display:flex;gap:5px;flex-wrap:wrap;flex-shrink:0;align-items:center}
+  .seclbl{width:100%;font-size:9px;color:var(--mut2);letter-spacing:2px;text-transform:uppercase;margin-bottom:1px}
+  .chip,.lchip,.wchip{cursor:pointer;user-select:none;padding:4px 10px;border:1px solid var(--line2);border-radius:4px;
+    font-size:10px;letter-spacing:.5px;color:var(--mut);transition:all .15s;background:rgba(255,255,255,.01)}
+  .chip:hover,.lchip:hover,.wchip:hover{border-color:var(--mut);color:var(--txt)}
+  .chip.active,.lchip.on,.wchip.on{color:#fff;background:rgba(77,219,255,.06)}
+  .chip[data-c="War"].active{border-color:var(--war);color:var(--war);box-shadow:inset 0 0 12px rgba(255,91,110,.15)}
+  .chip[data-c="Economy"].active{border-color:var(--eco);color:var(--eco);box-shadow:inset 0 0 12px rgba(255,180,84,.15)}
+  .chip[data-c="Politics"].active{border-color:var(--pol);color:var(--pol);box-shadow:inset 0 0 12px rgba(77,159,255,.15)}
+  .chip[data-c="Military"].active{border-color:var(--milcat);color:var(--milcat);box-shadow:inset 0 0 12px rgba(255,77,141,.15)}
+  select{background:var(--panel2);color:var(--txt);border:1px solid var(--line2);border-radius:4px;padding:4px 7px;font:10px ui-monospace,monospace;cursor:pointer}
+  .wbar .wlbl{font-size:9px;color:var(--mut2);width:100%;letter-spacing:2px;text-transform:uppercase}
   .lchip[data-l="front"].on{border-color:var(--war);color:var(--war)}
   .lchip[data-l="planes"].on{border-color:var(--mil);color:var(--mil)}
   .lchip[data-l="bases"].on{border-color:var(--base);color:var(--base)}
   .lchip[data-l="quakes"].on{border-color:var(--quake);color:var(--quake)}
   .lchip[data-l="sats"].on{border-color:var(--sat);color:var(--sat)}
   .wchip.on{border-color:#5b7fae;color:#9ec5ff}
-  #wopacity{width:80px}
-  #feed{flex:1;overflow-y:auto;font-size:12px}
-  .item{padding:8px 14px;border-bottom:1px solid var(--line);cursor:pointer;border-left:3px solid transparent;display:flex;gap:8px}
-  .item:hover{background:#141c27}
+  #wopacity{width:80px;accent-color:var(--cyan)}
+  #search{margin:9px 18px!important;padding:7px 11px!important;background:var(--panel2)!important;color:var(--txt);
+    border:1px solid var(--line2)!important;border-radius:5px;font:11px ui-monospace,monospace;flex-shrink:0;outline:none}
+  #search:focus{border-color:var(--cyan)!important;box-shadow:0 0 0 2px rgba(77,219,255,.1)}
+
+  /* ── 피드 ── */
+  #feed{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+  #feed::-webkit-scrollbar{width:7px}#feed::-webkit-scrollbar-thumb{background:var(--line2);border-radius:4px}
+  .item{padding:10px 16px;border-bottom:1px solid var(--line);cursor:pointer;border-left:2px solid transparent;display:flex;gap:10px;transition:background .12s}
+  .item:hover{background:rgba(77,219,255,.04)}
   .item.War{border-left-color:var(--war)}.item.Economy{border-left-color:var(--eco)}.item.Politics{border-left-color:var(--pol)}.item.Military{border-left-color:var(--milcat)}
-  .item img{width:46px;height:46px;object-fit:cover;border-radius:4px;flex-shrink:0;background:#1b2230}
-  .item .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
-  .item .t{font-size:12px;line-height:1.3}
-  .item .m{display:flex;justify-content:space-between;align-items:center;font:10px monospace;color:var(--mut)}
-  .badge{padding:1px 6px;border-radius:6px;font-weight:600}
-  .b-hi{background:rgba(255,23,68,.2);color:var(--crit)}.b-md{background:rgba(255,179,0,.15);color:var(--eco)}.b-lo{background:rgba(66,165,245,.1);color:var(--pol)}
-  .leaflet-popup-content-wrapper{background:var(--panel);color:var(--txt);border-radius:8px}
-  .leaflet-popup-tip{background:var(--panel)}
-  .leaflet-popup-content{margin:0;font-size:11px;width:240px!important}
-  .pop{overflow:hidden;border-radius:8px}
-  .pop img{width:100%;height:120px;object-fit:cover;display:block;background:#1b2230}
-  .pop .pc{padding:8px 10px}
-  .pop-t{font-weight:600;margin-bottom:5px;font-size:12px;line-height:1.35}
-  .pop-s{color:#c4ccd6;font-size:11px;line-height:1.4;margin-bottom:6px}
-  .pop-m{color:var(--mut);font:10px/1.5 monospace}.pop-m a{color:var(--pol)}
-  .plane{font-size:16px;filter:drop-shadow(0 0 3px #00e5ff)}
-  .legend{position:absolute;bottom:16px;right:16px;z-index:500;background:rgba(15,20,25,.92);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font:10px monospace;color:var(--mut);max-height:45vh;overflow:auto}
-  .legend span{display:flex;align-items:center;gap:6px;margin:3px 0}.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
-  #status{position:absolute;top:12px;left:12px;background:rgba(0,0,0,.6);padding:6px 12px;border-radius:4px;font:11px monospace;z-index:501}
-  #milstat{position:absolute;top:44px;left:12px;background:rgba(0,229,255,.12);border:1px solid var(--mil);color:var(--mil);padding:4px 10px;border-radius:4px;font:10px monospace;z-index:501;display:none}
-  #satstat{position:absolute;top:76px;left:12px;background:rgba(124,77,255,.14);border:1px solid var(--sat);color:#b39dff;padding:4px 10px;border-radius:4px;font:10px monospace;z-index:501;display:none}
-  @media(max-width:768px){#app{grid-template-columns:1fr;grid-template-rows:auto 60%}#side{max-height:46vh}}
+  .item img{width:48px;height:48px;object-fit:cover;border-radius:4px;flex-shrink:0;background:#111a26;border:1px solid var(--line)}
+  .item .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+  .item .t{font-size:12px;line-height:1.35;font-family:system-ui,sans-serif;color:#e8f0f8}
+  .item .m{display:flex;justify-content:space-between;align-items:center;font-size:9px;color:var(--mut);letter-spacing:.5px}
+  .badge{padding:2px 6px;border-radius:3px;font-weight:700;font-size:9px}
+  .b-hi{background:rgba(255,59,92,.18);color:var(--crit);border:1px solid rgba(255,59,92,.3)}
+  .b-md{background:rgba(255,180,84,.13);color:var(--eco);border:1px solid rgba(255,180,84,.25)}
+  .b-lo{background:rgba(77,159,255,.1);color:var(--pol);border:1px solid rgba(77,159,255,.2)}
+
+  /* ── 팝업 ── */
+  .leaflet-popup-content-wrapper{background:var(--panel2);color:var(--txt);border-radius:8px;border:1px solid var(--line2);box-shadow:0 8px 32px rgba(0,0,0,.6)}
+  .leaflet-popup-tip{background:var(--panel2);border:1px solid var(--line2)}
+  .leaflet-popup-content{margin:0;font-size:11px;width:248px!important}
+  .pop{overflow:hidden;border-radius:7px}
+  .pop img{width:100%;height:124px;object-fit:cover;display:block;background:#111a26}
+  .pop .pc{padding:10px 12px}
+  .pop-t{font-weight:600;margin-bottom:6px;font-size:12px;line-height:1.4;font-family:system-ui,sans-serif}
+  .pop-s{color:#aebccb;font-size:11px;line-height:1.45;margin-bottom:7px;font-family:system-ui,sans-serif}
+  .pop-m{color:var(--mut);font-size:10px;line-height:1.6}.pop-m a{color:var(--cyan);text-decoration:none}
+
+  /* ── 지도 오버레이 ── */
+  .legend{position:absolute;bottom:18px;right:18px;z-index:500;background:rgba(10,16,25,.94);
+    border:1px solid var(--line2);border-radius:7px;padding:11px 14px;font-size:10px;color:var(--mut);max-height:45vh;overflow:auto;
+    backdrop-filter:blur(8px);letter-spacing:.3px}
+  .legend span{display:flex;align-items:center;gap:7px;margin:4px 0}.legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+  #status{position:absolute;top:14px;left:14px;background:rgba(10,16,25,.85);border:1px solid var(--line2);
+    padding:7px 13px;border-radius:5px;font-size:10px;z-index:501;backdrop-filter:blur(6px);letter-spacing:.5px}
+  #milstat,#satstat,#gdeltstat{position:absolute;left:14px;padding:5px 11px;border-radius:5px;font-size:10px;z-index:501;display:none;backdrop-filter:blur(6px);letter-spacing:.5px}
+  #gdeltstat{top:48px;background:rgba(77,219,255,.1);border:1px solid var(--cyan);color:var(--cyan)}
+  #milstat{top:82px;background:rgba(77,219,255,.1);border:1px solid var(--mil);color:var(--mil)}
+  #satstat{top:116px;background:rgba(157,140,255,.13);border:1px solid var(--sat);color:#b9adff}
+
+  @media(max-width:768px){#app{grid-template-columns:1fr;grid-template-rows:auto 58%}#side{max-height:48vh}
+    body::before{background-size:28px 28px}}
+  @media(prefers-reduced-motion:reduce){.tcircle::after,header h1::before{animation:none}}
 </style>
 </head>
 <body>
 <div id="app">
   <div id="side">
     <header>
-      <h1>Global Radar</h1>
-      <div class="sub"><span id="conn" class="dot off"></span><span id="loaded">loading…</span><span id="count">0</span></div>
+      <h1>GLOBAL RADAR</h1>
+      <div class="sub"><span id="conn" class="dot off"></span><span>SYNC <span id="loaded">—</span></span><span>·</span><span><span id="count">0</span></span></div>
     </header>
     <div id="threat">
       <div id="tcircle" class="tcircle">–</div>
       <div class="tinfo">
-        <div class="lbl">THREAT INDEX (SELF-ASSESSED)</div>
+        <div class="lbl">Threat Index · self-assessed</div>
         <div class="val" id="tval">—</div>
         <div class="tstats">
-          <div class="tstat"><b id="s-crit" style="color:var(--crit)">0</b><span>CRITICAL</span></div>
-          <div class="tstat"><b id="s-war" style="color:var(--war)">0</b><span>WAR</span></div>
-          <div class="tstat"><b id="s-eco" style="color:var(--eco)">0</b><span>ECON</span></div>
-          <div class="tstat"><b id="s-tot">0</b><span>24H TOTAL</span></div>
+          <div class="tstat"><b id="s-crit" style="color:var(--crit)">0</b><span>Critical</span></div>
+          <div class="tstat"><b id="s-war" style="color:var(--war)">0</b><span>War</span></div>
+          <div class="tstat"><b id="s-eco" style="color:var(--eco)">0</b><span>Econ</span></div>
+          <div class="tstat"><b id="s-tot">0</b><span>24h</span></div>
         </div>
         <div class="est">자체 산출 · 최근 24h 신호 기반 · 공식 DEFCON 아님</div>
       </div>
     </div>
     <div class="ctrls">
+      <div class="seclbl">Categories · Filter</div>
       <div class="chip active" data-c="all">ALL</div>
       <div class="chip active" data-c="War">War</div>
       <div class="chip active" data-c="Economy">Economy</div>
       <div class="chip active" data-c="Politics">Politics</div>
       <div class="chip active" data-c="Military">⚔ Mil-Event</div>
-      <select id="period"><option value="86400">24h</option><option value="259200">3d</option><option value="604800" selected>7d</option></select>
+      <select id="period"><option value="86400" selected>24h</option><option value="259200">3d</option><option value="604800">7d</option></select>
       <select id="minimp"><option value="0">All</option><option value="6">≥6</option><option value="8">≥8</option></select>
     </div>
     <div class="layers">
+      <div class="seclbl">Map Layers</div>
       <div class="lchip on" data-l="front">🇺🇦 전선</div>
       <div class="lchip" data-l="planes">✈ 군용기</div>
       <div class="lchip" data-l="bases">🪖 기지</div>
@@ -114,7 +170,7 @@
       <div class="lchip" data-l="sats">🛰 위성</div>
     </div>
     <div class="wbar">
-      <div class="wlbl">🌦 WEATHER LAYERS</div>
+      <div class="wlbl">Weather Overlays</div>
       <div class="wchip" data-w="rain">🌧 강수/구름</div>
       <div class="wchip" data-w="clouds">☁ 구름</div>
       <div class="wchip" data-w="temp">🌡 기온</div>
@@ -123,6 +179,7 @@
       <div class="wchip" data-w="precip">🌦 강수량</div>
       <input id="wopacity" type="range" min="20" max="100" value="70" title="불투명도">
     </div>
+    <input id="search" placeholder="🔍 뉴스·지역 검색…">
     <div id="feed"></div>
   </div>
   <div style="position:relative">
@@ -164,9 +221,10 @@ const active=new Set(["War","Economy","Politics","Military"]);
 // 레이어 그룹
 const frontLayer=L.layerGroup().addTo(map);
 const planeLayer=L.layerGroup();
-const baseLayer=L.layerGroup();
+const baseLayer=L.markerClusterGroup({maxClusterRadius:50,disableClusteringAtZoom:7,chunkedLoading:true,spiderfyOnMaxZoom:false});
 const quakeLayer=L.layerGroup();
 const satLayer=L.layerGroup();
+const eventCluster=L.markerClusterGroup({maxClusterRadius:45,disableClusteringAtZoom:6,chunkedLoading:true,spiderfyOnMaxZoom:true}).addTo(map);
 
 function ago(ts){const d=Date.now()/1000-ts;if(d<3600)return Math.floor(d/60)+"m";if(d<86400)return Math.floor(d/3600)+"h";return Math.floor(d/86400)+"d"}
 function esc(s){return (s||"").replace(/</g,"&lt;").replace(/>/g,"&gt;")}
@@ -193,22 +251,26 @@ function popupHTML(d){
 }
 function filtered(){
   const period=+document.getElementById("period").value,minImp=+document.getElementById("minimp").value,now=Date.now()/1000;
-  return ALL.filter(d=>active.has(d.category)&&(now-d.ts)<=period&&d.impact_score>=minImp);
+  const q=(document.getElementById("search")?.value||"").toLowerCase().trim();
+  return ALL.filter(d=>active.has(d.category)&&(now-d.ts)<=period&&d.impact_score>=minImp
+    &&(!q||(d.title+" "+d.place+" "+d.source).toLowerCase().includes(q)));
 }
 function render(){
   const data=filtered();
-  markers.forEach(m=>map.removeLayer(m));markers.clear();
+  eventCluster.clearLayers();markers.clear();
   document.getElementById("count").textContent=data.length+" events";
+  const batch=[];
   data.forEach(d=>{
     const color=COLOR[d.category]||"#8b97a7",crit=d.impact_score>=8,milEv=d.category==="Military";
     const m=L.circleMarker([d.lat,d.lng],{radius:4+d.impact_score*0.7,color:milEv?"#ff3d71":"#fff",weight:crit||milEv?2:1,fillColor:color,fillOpacity:.85});
-    m.bindPopup(popupHTML(d),{maxWidth:260});m.addTo(map);markers.set(d.id,m);
+    m.bindPopup(popupHTML(d),{maxWidth:260});markers.set(d.id,m);batch.push(m);
   });
+  eventCluster.addLayers(batch);
   const feed=document.getElementById("feed");feed.innerHTML="";
-  data.forEach(d=>{
+  data.slice(0,200).forEach(d=>{
     const el=document.createElement("div");el.className="item "+d.category;
     const thumb=d.img?`<img src="${d.img}" onerror="this.style.visibility='hidden'">`:`<img style="visibility:hidden">`;
-    el.innerHTML=`${thumb}<div class="body"><div class="t">${esc(d.title)}</div><div class="m"><span>${esc(d.source)} · ${ago(d.ts)}</span><span class="badge ${impClass(d.impact_score)}">${d.impact_score}/10</span></div></div>`;
+    el.innerHTML=`${thumb}<div class="body"><div class="t">${esc(d.title)}</div><div class="m"><span>📍${esc(d.place||"—")} · ${esc(d.source)} · ${ago(d.ts)}</span><span class="badge ${impClass(d.impact_score)}">${d.impact_score}</span></div></div>`;
     el.onclick=()=>{map.flyTo([d.lat,d.lng],6);markers.get(d.id)?.openPopup()};
     feed.appendChild(el);
   });
@@ -364,6 +426,143 @@ const BASES=[
   ["Antonio Bautista AB (Palawan)",9.7420,118.7590,"🇵🇭"],["Basa AB (Philippines)",15.0500,120.4920,"🇵🇭"],
   ["Tinian (Pacific)",15.0000,145.6200,"🇺🇸"],["Wake Island",19.2820,166.6470,"🇺🇸"],
   ["Kwajalein (Marshall Is.)",8.7200,167.7300,"🇺🇸"],
+  // === 추가 batch 5 ===
+  ["Fort Liberty (NC)",35.1410,-79.0060,"🇺🇸"],["Joint Base Andrews",38.8108,-76.8670,"🇺🇸"],
+  ["Cannon AFB",34.3828,-103.3220,"🇺🇸"],["Davis-Monthan AFB",32.1665,-110.8830,"🇺🇸"],
+  ["Mountain Home AFB",43.0436,-115.8720,"🇺🇸"],["Cavalier SFS (radar)",48.7240,-97.9000,"🇺🇸"],
+  ["Clear SFS (Alaska)",64.2900,-149.1870,"🇺🇸"],["Eielson AFB (Alaska)",64.6657,-147.1010,"🇺🇸"],
+  ["Elmendorf-Richardson",61.2510,-149.8070,"🇺🇸"],["Fort Wainwright",64.8280,-147.6420,"🇺🇸"],
+  // 영국/유럽 추가
+  ["RAF Marham (UK)",52.6483,0.5500,"🇬🇧"],["RAF Waddington (ISR)",53.1662,-0.5240,"🇬🇧"],
+  ["Clyde/Coulport (UK nukes)",56.0530,-4.8800,"🇬🇧"],["Évreux AB (France)",49.0287,1.2197,"🇫🇷"],
+  ["Saint-Dizier AB (France)",48.6360,4.8994,"🇫🇷"],["Nörvenich AB (Germany)",50.8312,6.6581,"🇩🇪"],
+  ["Volkel AB (NL, nukes)",51.6564,5.7089,"🇳🇱"],["Kleine Brogel (BE, nukes)",51.1683,5.4700,"🇧🇪"],
+  ["Ghedi AB (Italy, nukes)",45.4322,10.2677,"🇮🇹"],["Decimomannu (Sardinia)",39.3542,8.9725,"🇮🇹"],
+  ["Albacete AB (Spain)",38.9485,-1.8635,"🇪🇸"],["Beja AB (Portugal)",38.0789,-7.9324,"🇵🇹"],
+  // 러시아/중앙아 추가
+  ["Khrabrovo (Kaliningrad)",54.8900,20.5926,"🇷🇺"],["Chkalov (Novosibirsk)",55.0900,82.9000,"🇷🇺"],
+  ["Akhtubinsk (flight test)",48.2850,46.2600,"🇷🇺"],["Privolzhsky AB",46.2400,48.0900,"🇷🇺"],
+  ["Dombarovsky (ICBM)",51.1700,59.8500,"🇷🇺"],["Kozelsk (ICBM)",54.0300,35.7700,"🇷🇺"],
+  // 중국 추가
+  ["Datong AB",40.0600,113.4800,"🇨🇳"],["Leiyang AB",26.4150,112.8550,"🇨🇳"],
+  ["Wuhan (PLA Navy HQ area)",30.5800,114.3000,"🇨🇳"],["Xiamen (opposite Taiwan)",24.5440,118.1270,"🇨🇳"],
+  // 중동/남아시아 추가
+  ["Konarak (Iran navy)",25.4400,60.3700,"🇮🇷"],["Chabahar (Iran)",25.2920,60.6430,"🇮🇷"],
+  ["Tabuk AB (Saudi)",28.3654,36.6189,"🇸🇦"],["Dhahran (Saudi)",26.2654,50.1520,"🇸🇦"],
+  ["Minhad AB (UAE)",25.0277,55.3661,"🇦🇪"],["Thumrait AB (Oman)",17.6660,54.0246,"🇴🇲"],
+  ["Ambala AB (India)",30.3700,76.8170,"🇮🇳"],["Pathankot AB (India)",32.2337,75.6346,"🇮🇳"],
+  ["Leh (Ladakh, India)",34.1359,77.5465,"🇮🇳"],["Skardu (Pakistan)",35.3350,75.5360,"🇵🇰"],
+  // 동아시아 추가
+  ["Hyakuri AB (Japan)",36.1810,140.4150,"🇯🇵"],["Nyutabaru AB (Japan)",32.0836,131.4490,"🇯🇵"],
+  ["Naha AB (Okinawa)",26.1958,127.6460,"🇯🇵"],["Gwangju AB (Korea)",35.1264,126.8090,"🇰🇷"],
+  ["Daegu AB (Korea)",35.8940,128.6590,"🇰🇷"],["Hsinchu AB (Taiwan)",24.8180,120.9390,"🇹🇼"],
+  ["Chiayi AB (Taiwan)",23.4618,120.3930,"🇹🇼"],["Hualien AB (Taiwan)",24.0230,121.6180,"🇹🇼"],
+  // 동남아/오세아니아
+  ["Paya Lebar (Singapore)",1.3603,103.9106,"🇸🇬"],["Korat RTAFB (Thailand)",14.9347,102.0790,"🇹🇭"],
+  ["Biak (Indonesia)",-1.1900,136.1080,"🇮🇩"],["RAAF Amberley",-27.6406,152.7120,"🇦🇺"],
+  ["RAAF Williamtown",-32.7950,151.8340,"🇦🇺"],["Ohakea (NZ)",-40.2060,175.3880,"🇳🇿"],
+  // 남미/아프리카
+  ["Anápolis AB (Brazil)",-16.2290,-48.9640,"🇧🇷"],["Palanquero (Colombia)",5.4800,-74.6560,"🇨🇴"],
+  ["Simon's Town (S.Africa)",-34.1920,18.4300,"🇿🇦"],["Alcântara (Brazil space)",-2.3730,-44.3960,"🇧🇷"],
+  // === 추가 batch 6 ===
+  ["Fort Bliss (TX)",31.8120,-106.4210,"🇺🇸"],["Fort Sill (OK)",34.6590,-98.4020,"🇺🇸"],
+  ["Fort Benning (GA)",32.3540,-84.9700,"🇺🇸"],["Fort Riley (KS)",39.0850,-96.7640,"🇺🇸"],
+  ["Twentynine Palms",34.2300,-116.0540,"🇺🇸"],["Quantico (USMC)",38.5220,-77.3050,"🇺🇸"],
+  ["Cherry Point MCAS",34.9009,-76.8807,"🇺🇸"],["Beaufort MCAS",32.4774,-80.7231,"🇺🇸"],
+  ["Tucson AMARG",32.1510,-110.8420,"🇺🇸"],["Patrick SFB",28.2348,-80.6101,"🇺🇸"],
+  // 캐나다
+  ["CFB Cold Lake",54.4050,-110.2790,"🇨🇦"],["CFB Bagotville",48.3306,-70.9964,"🇨🇦"],
+  ["CFB Halifax",44.6500,-63.5700,"🇨🇦"],["CFB Esquimalt",48.4310,-123.4290,"🇨🇦"],
+  // 유럽 추가
+  ["Pápa AB (Hungary)",47.3636,17.5006,"🇭🇺"],["Čáslav AB (Czech)",49.9397,15.3819,"🇨🇿"],
+  ["Sliač AB (Slovakia)",48.6378,19.1344,"🇸🇰"],["Malbork AB (Poland)",54.0269,19.1342,"🇵🇱"],
+  ["Powidz AB (Poland)",52.3794,17.8542,"🇵🇱"],["Ramat David (Israel)",32.6650,35.1790,"🇮🇱"],
+  ["Andøya (Norway)",69.2925,16.1442,"🇳🇴"],["Bodø (Norway)",67.2692,14.3653,"🇳🇴"],
+  ["Luleå/Kallax (Sweden)",65.5438,22.1219,"🇸🇪"],["Rovaniemi (Finland)",66.5648,25.8304,"🇫🇮"],
+  // 러시아/중앙아 추가
+  ["Hmeimim",35.4011,35.9486,"🇸🇾"],["Eltsovka (Novosibirsk)",55.0900,82.9000,"🇷🇺"],
+  ["Belaya AB (bombers)",52.9150,103.5750,"🇷🇺"],["Shaykovka AB",54.2330,34.3670,"🇷🇺"],
+  ["Marinovka AB",48.6300,43.7900,"🇷🇺"],["Millerovo AB",48.9530,40.3030,"🇷🇺"],
+  // 중국 추가
+  ["Shaoguan AB",24.7900,113.5200,"🇨🇳"],["Foshan AB",23.0800,113.0700,"🇨🇳"],
+  ["Guilin AB",25.2180,110.0390,"🇨🇳"],["Liuzhou AB",24.2070,109.3910,"🇨🇳"],
+  ["Zhengzhou AB",34.5197,113.8410,"🇨🇳"],["Jinan AB",36.8570,117.2160,"🇨🇳"],
+  // 인도/남아시아
+  ["Tezpur AB (India)",26.7091,92.7847,"🇮🇳"],["Chabua AB (India)",27.4622,95.1175,"🇮🇳"],
+  ["Jaisalmer AB (India)",26.8880,70.8650,"🇮🇳"],["Bhuj AB (India)",23.2880,69.6700,"🇮🇳"],
+  ["Masroor AB (Pakistan)",24.8930,66.9380,"🇵🇰"],["Kamra/Minhas (Pakistan)",33.8690,72.4010,"🇵🇰"],
+  // 동남아/태평양
+  ["Cam Ranh (Vietnam)",11.9980,109.2190,"🇻🇳"],["Phu Cat (Vietnam)",13.9550,109.0420,"🇻🇳"],
+  ["Lumut Naval (Malaysia)",4.2300,100.6300,"🇲🇾"],["Halim (Indonesia)",-6.2666,106.8910,"🇮🇩"],
+  ["Don Muang (Thailand)",13.9126,100.6070,"🇹🇭"],["Butterworth (Malaysia)",5.4659,100.3910,"🇦🇺"],
+  // 중동 추가
+  ["Hamad (Qatar)",25.1170,51.3150,"🇶🇦"],["Isa AB (Bahrain)",25.9210,50.5900,"🇧🇭"],
+  ["Seeb (Oman)",23.5933,58.2844,"🇴🇲"],["Mezze (Syria)",33.4790,36.2240,"🇸🇾"],
+  ["Shayrat (Syria)",34.4900,36.9100,"🇸🇾"],["T-4/Tiyas (Syria)",34.5230,37.6280,"🇸🇾"],
+  // 아프리카 추가
+  ["Wheelus/Mitiga (Libya)",32.8940,13.2760,"🇱🇾"],["Al Watiya (Libya)",32.0500,11.4200,"🇱🇾"],
+  ["Bosaso (Somalia)",11.2750,49.1490,"🇸🇴"],["Baledogle (Somalia)",2.6500,44.5500,"🇺🇸"],
+  // === 대량 추가 batch 7 ===
+  // 미국 추가
+  ["Luke AFB",33.5350,-112.3830,"🇺🇸"],["Seymour Johnson AFB",35.3394,-77.9606,"🇺🇸"],
+  ["Shaw AFB",33.9727,-80.4731,"🇺🇸"],["Moody AFB",30.9678,-83.1930,"🇺🇸"],
+  ["Columbus AFB",33.6438,-88.4438,"🇺🇸"],["Laughlin AFB",29.3597,-100.7780,"🇺🇸"],
+  ["Sheppard AFB",33.9888,-98.4919,"🇺🇸"],["Vance AFB",36.3392,-97.9165,"🇺🇸"],
+  ["Grand Forks AFB",47.9613,-97.4011,"🇺🇸"],["McConnell AFB",37.6219,-97.2672,"🇺🇸"],
+  ["Robins AFB",32.6400,-83.5919,"🇺🇸"],["Tinker AFB",35.4148,-97.3866,"🇺🇸"],
+  ["Hanscom AFB",42.4700,-71.2890,"🇺🇸"],["Scott AFB",38.5453,-89.8353,"🇺🇸"],
+  ["Buckley SFB",39.7017,-104.7520,"🇺🇸"],["Los Angeles SFB",33.9167,-118.3850,"🇺🇸"],
+  ["NAS Lemoore",36.3330,-119.9520,"🇺🇸"],["NAS Oceana",36.8207,-76.0332,"🇺🇸"],
+  ["NAS Whidbey Island",48.3517,-122.6560,"🇺🇸"],["NAS Jacksonville",30.2358,-81.6806,"🇺🇸"],
+  ["NAS Pensacola",30.3530,-87.3190,"🇺🇸"],["Naval Station Mayport",30.3920,-81.4240,"🇺🇸"],
+  ["Naval Base Coronado",32.6790,-117.1580,"🇺🇸"],["Camp Lejeune",34.6920,-77.3410,"🇺🇸"],
+  // 영국/유럽
+  ["RAF Fairford",51.6822,-1.7900,"🇬🇧"],["RAF Mildenhall",52.3619,0.4864,"🇺🇸"],
+  ["RAF Valley",53.2481,-4.5354,"🇬🇧"],["RAF Coningsby",53.0930,-0.1660,"🇬🇧"],
+  ["Leeuwarden AB (NL)",53.2286,5.7606,"🇳🇱"],["Florennes AB (BE)",50.2436,4.6458,"🇧🇪"],
+  ["Cazaux AB (France)",44.5333,-1.1250,"🇫🇷"],["Orange AB (France)",44.1406,4.8672,"🇫🇷"],
+  ["Wittmund AB (Germany)",53.5478,7.6675,"🇩🇪"],["Neuburg AB (Germany)",48.7108,11.2117,"🇩🇪"],
+  ["Cameri AB (Italy)",45.5294,8.6678,"🇮🇹"],["Grosseto AB (Italy)",42.7597,11.0717,"🇮🇹"],
+  ["Los Llanos AB (Spain)",38.9485,-1.8635,"🇪🇸"],["Zaragoza AB (Spain)",41.6661,-1.0417,"🇪🇸"],
+  ["Larissa AB (Greece)",39.6503,22.4653,"🇬🇷"],["Andravida AB (Greece)",37.9206,21.2925,"🇬🇷"],
+  ["Çiğli AB (Turkey)",38.5131,27.0103,"🇹🇷"],["Konya AB (Turkey)",37.9790,32.5619,"🇹🇷"],
+  ["Diyarbakır AB (Turkey)",37.8939,40.2010,"🇹🇷"],
+  // 러시아
+  ["Lipetsk AB",52.7030,39.5380,"🇷🇺"],["Voronezh/Baltimor AB",51.6570,39.2290,"🇷🇺"],
+  ["Morozovsk AB",48.3083,41.7911,"🇷🇺"],["Buturlinovka AB",50.7900,40.6350,"🇷🇺"],
+  ["Kursk/Khalino AB",51.7503,36.2956,"🇷🇺"],["Savasleyka AB",55.4533,42.3308,"🇷🇺"],
+  ["Privolzhsky",46.2400,48.0900,"🇷🇺"],["Akhtubinsk",48.2850,46.2600,"🇷🇺"],
+  ["Yeysk AB",46.6800,38.2600,"🇷🇺"],["Krymsk AB",44.9580,37.9870,"🇷🇺"],
+  ["Primorsko-Akhtarsk",46.0510,38.1540,"🇷🇺"],
+  // 중국
+  ["Anqing AB",30.5822,117.0500,"🇨🇳"],["Wuhu AB",31.3917,118.4090,"🇨🇳"],
+  ["Suixi AB",21.3970,110.1980,"🇨🇳"],["Luhe/Ma'an AB",32.1530,118.8800,"🇨🇳"],
+  ["Quzhou AB",28.9657,118.8990,"🇨🇳"],["Longtian AB",25.6700,119.3300,"🇨🇳"],
+  ["Huian AB",25.0000,118.7500,"🇨🇳"],["Zhangzhou AB",24.5100,117.6500,"🇨🇳"],
+  // 인도/주변
+  ["Gwalior AB (India)",26.2934,78.2278,"🇮🇳"],["Pune/Lohegaon (India)",18.5821,73.9197,"🇮🇳"],
+  ["Sirsa AB (India)",29.5560,75.0060,"🇮🇳"],["Halwara AB (India)",30.7490,75.6310,"🇮🇳"],
+  ["Adampur AB (India)",31.4338,75.7589,"🇮🇳"],["Bareilly AB (India)",28.4220,79.4510,"🇮🇳"],
+  ["Peshawar AB (Pakistan)",33.9939,71.5146,"🇵🇰"],["Quetta/Samungli (Pakistan)",30.2514,66.9378,"🇵🇰"],
+  ["Jacobabad AB (Pakistan)",28.2842,68.4497,"🇵🇰"],["Rafiqui AB (Pakistan)",30.7558,72.2825,"🇵🇰"],
+  // 동아시아
+  ["Komatsu AB (Japan)",36.3946,136.4070,"🇯🇵"],["Tsuiki AB (Japan)",33.6850,131.0400,"🇯🇵"],
+  ["Chitose AB (Japan)",42.7944,141.6670,"🇯🇵"],["Hamamatsu AB (Japan)",34.7503,137.7030,"🇯🇵"],
+  ["Suwon AB (Korea)",37.2394,127.0070,"🇰🇷"],["Seosan AB (Korea)",36.7041,126.4860,"🇰🇷"],
+  ["Wonju AB (Korea)",37.4381,127.9610,"🇰🇷"],["Sacheon AB (Korea)",35.0886,128.0700,"🇰🇷"],
+  // 동남아/오세아니아
+  ["Subang AB (Malaysia)",3.1306,101.5490,"🇲🇾"],["Gong Kedak (Malaysia)",5.7997,102.5040,"🇲🇾"],
+  ["Iwakuni MCAS (Japan)",34.1436,132.2360,"🇺🇸"],["RAAF Tindal",-14.5211,132.3780,"🇦🇺"],
+  ["RAAF Curtin",-17.5814,123.8280,"🇦🇺"],["RAAF Learmonth",-22.2356,114.0890,"🇦🇺"],
+  // 중동
+  ["Mihail (Romania)",44.3622,28.4883,"🇷🇴"],["Muharraq (Bahrain)",26.2710,50.6360,"🇧🇭"],
+  ["Doha/Al Udeid annex",25.1173,51.3150,"🇶🇦"],["Liwa (UAE)",23.1000,53.7700,"🇦🇪"],
+  ["Taif AB (Saudi)",21.4833,40.5436,"🇸🇦"],["Khamis Mushait (Saudi)",18.2972,42.8033,"🇸🇦"],
+  // 남미/아프리카
+  ["Campo Grande AB (Brazil)",-20.4687,-54.6725,"🇧🇷"],["Canoas AB (Brazil)",-29.9456,-51.1444,"🇧🇷"],
+  ["El Palomar (Argentina)",-34.6099,-58.6126,"🇦🇷"],["Los Cerrillos (Chile)",-33.4900,-70.6960,"🇨🇱"],
+  ["Waterkloof AB (S.Africa)",-25.8297,28.2225,"🇿🇦"],["Cairo West AB (Egypt)",30.1164,30.9156,"🇪🇬"],
+  ["Luxor AB (Egypt)",25.6710,32.7070,"🇪🇬"],["Sidi Barrani (Egypt)",31.5000,25.9000,"🇪🇬"],
 ];
 BASES.forEach(([name,lat,lng,flag])=>{
   L.circleMarker([lat,lng],{radius:5,color:"#fff",weight:1,fillColor:"#ff9100",fillOpacity:.9})
@@ -408,20 +607,24 @@ function loadSats(list){
 function updateSats(){
   if(!map.hasLayer(satLayer)||!SATS.length)return;
   const now=new Date(),gmst=satellite.gstime(now);
-  satLayer.clearLayers();let ok=0;
+  const bounds=map.getBounds().pad(0.2); // 화면 영역 + 여유
+  satLayer.clearLayers();let ok=0,shown=0;
   SATS.forEach(s=>{
     try{
       const pv=satellite.propagate(s.satrec,now);if(!pv.position)return;
       const gd=satellite.eciToGeodetic(pv.position,gmst);
       const lon=satellite.degreesLong(gd.longitude),lat=satellite.degreesLat(gd.latitude);
+      ok++;
+      if(!bounds.contains([lat,lon]))return; // 화면 밖이면 안 그림 (렉 방지)
+      if(shown>=250)return;                  // 화면 안이어도 최대 250개
+      shown++;
       const col=SATCOLOR[s.group]||"#7c4dff";
-      L.marker([lat,lon],{icon:L.divIcon({className:"",html:`<svg width="18" height="18" viewBox="0 0 24 24" style="filter:drop-shadow(0 0 2px ${col})"><g stroke="${col}" stroke-width="1.4" fill="none"><rect x="10" y="10" width="4" height="4" fill="${col}" transform="rotate(45 12 12)"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="12" y1="16" x2="12" y2="21"/><rect x="3" y="9.5" width="5" height="5" fill="${col}" opacity=".7" transform="rotate(45 5.5 12)"/><rect x="16" y="9.5" width="5" height="5" fill="${col}" opacity=".7" transform="rotate(45 18.5 12)"/></g></svg>`,iconSize:[18,18],iconAnchor:[9,9]})})
+      L.marker([lat,lon],{icon:L.divIcon({className:"",html:`<svg width="16" height="16" viewBox="0 0 24 24" style="filter:drop-shadow(0 0 2px ${col})"><g stroke="${col}" stroke-width="1.4" fill="none"><rect x="10" y="10" width="4" height="4" fill="${col}" transform="rotate(45 12 12)"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="12" y1="16" x2="12" y2="21"/><rect x="3" y="9.5" width="5" height="5" fill="${col}" opacity=".7" transform="rotate(45 5.5 12)"/><rect x="16" y="9.5" width="5" height="5" fill="${col}" opacity=".7" transform="rotate(45 18.5 12)"/></g></svg>`,iconSize:[16,16],iconAnchor:[8,8]})})
         .bindPopup(`<div class="pop"><div class="pc"><div class="pop-t">🛰 ${esc(s.name)}</div><div class="pop-m">분류: ${esc(s.label)}<br>고도 ${Math.round(gd.height)} km</div></div></div>`)
         .addTo(satLayer);
-      ok++;
     }catch(e){}
   });
-  const ss=document.getElementById("satstat");ss.style.display="block";ss.textContent=`🛰 ${ok} satellites · live`;
+  const ss=document.getElementById("satstat");ss.style.display="block";ss.textContent=`🛰 ${ok} tracked · ${shown} shown`;
 }
 
 // ===== 기상 (OWM 키 내장 + RainViewer) =====
@@ -469,7 +672,7 @@ document.querySelector(".layers").addEventListener("click",e=>{
   if(l==="sats"){
     if(on){satLayer.addTo(map);const ss=document.getElementById("satstat");ss.style.display="block";
       if(!SATS.length){ss.textContent="🛰 TLE 로딩 중…";pullSats().then(()=>updateSats());}else updateSats();
-      satTimer=setInterval(updateSats,1000);}
+      satTimer=setInterval(updateSats,2000);}
     else{clearInterval(satTimer);map.removeLayer(satLayer);satLayer.clearLayers();document.getElementById("satstat").style.display="none";}
   }
 });
@@ -485,6 +688,8 @@ document.querySelector(".ctrls").addEventListener("click",e=>{
 });
 document.getElementById("period").onchange=render;
 document.getElementById("minimp").onchange=render;
+let searchTimer=null;
+document.getElementById("search").oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(render,250);};
 
 // ===========================================================
 // 실시간 엔진 (프록시 경유) — 로직 그대로
@@ -529,26 +734,87 @@ const PLACES={
   "vietnam":[14.0583,108.2772],"myanmar":[21.9162,95.9560],"bangladesh":[23.6850,90.3563],
   "greece":[39.0742,21.8243],"netherlands":[52.1326,5.2913],"sweden":[60.1282,18.6435],
   "norway":[60.4720,8.4689],"finland":[61.9241,25.7482],"switzerland":[46.8182,8.2275],
-  "colombia":[4.5709,-74.2973],"chile":[-35.6751,-71.5430],"peru":[-9.1900,-75.0152]
+  "colombia":[4.5709,-74.2973],"chile":[-35.6751,-71.5430],"peru":[-9.1900,-75.0152],
+  // === 분쟁지역 주요 도시 (수도 대신 실제 발생지에 표시) ===
+  // 우크라이나
+  "donetsk":[48.0159,37.8028],"luhansk":[48.5740,39.3078],"bakhmut":[48.5957,38.0094],
+  "avdiivka":[48.1392,37.7497],"kharkiv":[49.9935,36.2304],"kherson":[46.6354,32.6169],
+  "zaporizhzhia":[47.8388,35.1396],"mariupol":[47.0971,37.5434],"mykolaiv":[46.9750,31.9946],
+  "odesa":[46.4825,30.7233],"odessa":[46.4825,30.7233],"dnipro":[48.4647,35.0462],
+  "kramatorsk":[48.7389,37.5848],"sloviansk":[48.8530,37.6066],"sumy":[50.9077,34.7981],
+  "chernihiv":[51.4982,31.2893],"lviv":[49.8397,24.0297],"pokrovsk":[48.2814,37.1761],
+  "kupiansk":[49.7103,37.6158],"vuhledar":[47.7800,37.2500],"chasiv yar":[48.5900,37.8300],
+  "crimea":[45.0000,34.0000],"sevastopol":[44.6166,33.5254],"melitopol":[46.8489,35.3656],
+  // 중동 - 가자/이스라엘/레바논
+  "gaza city":[31.5017,34.4668],"rafah":[31.2972,34.2436],"khan younis":[31.3400,34.3060],
+  "ramallah":[31.9038,35.2034],"west bank":[31.9522,35.2332],"hebron":[31.5326,35.0998],
+  "haifa":[32.7940,34.9896],"tel aviv":[32.0853,34.7818],"eilat":[29.5577,34.9519],
+  "beirut":[33.8938,35.5018],"southern lebanon":[33.2700,35.2000],"tyre":[33.2705,35.2038],
+  "sidon":[33.5571,35.3729],"baalbek":[34.0058,36.2181],"golan":[33.0000,35.7500],
+  "golan heights":[33.0000,35.7500],
+  // 시리아
+  "aleppo":[36.2021,37.1343],"idlib":[35.9306,36.6339],"homs":[34.7324,36.7137],
+  "hama":[35.1318,36.7578],"raqqa":[35.9594,38.9981],"deir ez-zor":[35.3359,40.1408],
+  "latakia":[35.5317,35.7915],"daraa":[32.6189,36.1021],
+  // 예멘/홍해
+  "sanaa":[15.3694,44.1910],"aden":[12.7855,45.0187],"hodeidah":[14.7978,42.9545],
+  "red sea":[20.0000,38.0000],"bab el-mandeb":[12.5800,43.3300],
+  // 이라크/이란
+  "mosul":[36.3350,43.1189],"basra":[30.5085,47.7804],"fallujah":[33.3493,43.7866],
+  "erbil":[36.1900,43.9930],"kirkuk":[35.4681,44.3922],"isfahan":[32.6546,51.6680],
+  "natanz":[33.7250,51.7270],"bushehr":[28.9690,50.8350],"bandar abbas":[27.1833,56.2667],
+  // 아프리카 분쟁
+  "khartoum":[15.5007,32.5599],"omdurman":[15.6445,32.4777],"darfur":[13.0000,25.0000],
+  "el fasher":[13.6306,25.3490],"port sudan":[19.6175,37.2164],"tigray":[14.0000,38.5000],
+  "mekelle":[13.4969,39.4769],"goma":[-1.6792,29.2228],"mogadishu":[2.0469,45.3182],
+  "tripoli":[32.8872,13.1913],"benghazi":[32.1167,20.0683],"bamako":[12.6392,-8.0029],
+  "ouagadougou":[12.3714,-1.5197],"niamey":[13.5116,2.1254],
+  // 아시아 분쟁
+  "kashmir":[34.0837,74.7973],"srinagar":[34.0837,74.7973],"jammu":[32.7266,74.8570],
+  "rakhine":[20.1000,93.7000],"kachin":[25.3833,97.4000],"taipei":[25.0330,121.5654],
+  "taiwan strait":[24.5000,119.5000],"kinmen":[24.4360,118.3170],"senkaku":[25.7450,123.4780],
+  "south china sea":[13.0000,114.0000],"spratly":[9.5000,113.0000],"scarborough":[15.1500,117.7500],
+  // 기타 주요 도시
+  "moscow":[55.7558,37.6173],"st petersburg":[59.9311,30.3609],"belgorod":[50.5950,36.5870],
+  "kursk":[51.7300,36.1900],"rostov":[47.2357,39.7015],"sochi":[43.5855,39.7231],
+  "washington dc":[38.9072,-77.0369],"new york":[40.7128,-74.0060],"brussels":[50.8503,4.3517]
 };
 const IMPACT={
-  10:["nuclear","world war","invasion","genocide","collapse"],
-  9:["emergency","coup","assassination","missile strike","rate hike","rate cut","default","airstrike"],
-  8:["escalation","resignation","market crash","recession","sanctions","killed","attack"],
-  7:["military","summit","election","protest","tariff","conflict","strike"],
-  6:["warning","tension","talks","inflation"]
+  10:["nuclear war","world war iii","genocide"],
+  9:["nuclear","invasion","coup","assassination","ballistic missile"],
+  8:["airstrike","missile strike","killed","massacre","market crash","escalation"],
+  7:["military strike","offensive","shelling","bombing","casualties","sanctions"],
+  6:["conflict","clashes","attack","recession","emergency"]
 };
+// 보수적 점수: 기본 4점. 강한 신호 키워드 매칭 + 복수 신호 시에만 상승.
+function scoreTxt(t){
+  t=t.toLowerCase();
+  let base=4;
+  for(const s of [10,9,8,7,6]){
+    if(IMPACT[s].some(w=>t.includes(w))){ base=s; break; }
+  }
+  // 단일 약한 신호면 한 단계 강등 (과대평가 방지)
+  const strongHits=[].concat(IMPACT[10],IMPACT[9],IMPACT[8]).filter(w=>t.includes(w)).length;
+  if(base>=7 && strongHits===0) base-=1;       // 강한 신호 없이 7+면 낮춤
+  if(base>=8 && strongHits<2 && !/nuclear|invasion|war/.test(t)) base-=1; // 8+는 복수 신호 요구
+  return Math.max(3,base);
+}
 const KW={
   War:["war","military","strike","missile","bomb","attack","invasion","troops","combat","shelling","ceasefire","conflict","weapon","killed","casualties","drone","explosion","offensive"],
   Economy:["inflation","interest rate","recession","gdp","fed","ecb","default","market","stock","trade","tariff","bank","currency","oil","commodity","crypto","economy","economic"],
   Politics:["election","president","minister","parliament","vote","coup","resign","summit","diplomacy","treaty","nato","congress","senate","sanction"]
 };
-function scoreTxt(t){t=t.toLowerCase();for(const s of [10,9,8,7,6]){if(IMPACT[s].some(w=>t.includes(w)))return s;}return 5;}
 function catTxt(t,d){t=t.toLowerCase();let best=d,bc=0;for(const c in KW){const n=KW[c].filter(w=>t.includes(w)).length;if(n>bc){bc=n;best=c;}}return bc>0?best:d;}
 function placeOf(t){
   t=" "+t.toLowerCase()+" ";
-  for(const n in PLACES){if(t.includes(" "+n+" ")||t.includes(n)){return [n.replace(/\b\w/g,c=>c.toUpperCase()),PLACES[n][0],PLACES[n][1]];}}
-  return null;
+  let best=null, bestLen=0;
+  for(const n in PLACES){
+    if((t.includes(" "+n+" ")||t.includes(n)) && n.length>bestLen){
+      best=[n.replace(/\b\w/g,c=>c.toUpperCase()),PLACES[n][0],PLACES[n][1]];
+      bestLen=n.length; // 가장 구체적인(긴) 지명 우선 → 수도보다 도시 우선
+    }
+  }
+  return best;
 }
 function hid(...p){let h=0,s=p.join("|");for(let i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0;}return "x"+h.toString(16);}
 
@@ -564,6 +830,7 @@ function showGdeltStat(){
 }
 // ---- RSS 뉴스 (GDELT 대체 주력 — 안정적, rate limit 없음) ----
 const RSS_FEEDS=[
+  // === 글로벌 주요 (영미권) ===
   ["https://feeds.bbci.co.uk/news/world/rss.xml","BBC","War"],
   ["https://www.aljazeera.com/xml/rss/all.xml","AlJazeera","War"],
   ["https://feeds.skynews.com/feeds/rss/world.xml","SkyNews","War"],
@@ -572,10 +839,58 @@ const RSS_FEEDS=[
   ["https://moxie.foxnews.com/google-publisher/world.xml","Fox","War"],
   ["https://rss.nytimes.com/services/xml/rss/nyt/World.xml","NYT","War"],
   ["https://www.france24.com/en/rss","France24","Politics"],
+  ["https://feeds.npr.org/1004/rss.xml","NPR World","Politics"],
+  ["https://feeds.a.dj.com/rss/RSSWorldNews.xml","WSJ World","War"],
+  ["https://www.cbsnews.com/latest/rss/world","CBS","War"],
+  ["https://abcnews.go.com/abcnews/internationalheadlines","ABC","War"],
+  ["https://www.cbc.ca/webfeed/rss/rss-world","CBC","Politics"],
+  // === 유럽 ===
+  ["https://www.euronews.com/rss?level=theme&name=news","Euronews","Politics"],
+  ["https://www.spiegel.de/international/index.rss","Spiegel","Politics"],
+  ["https://english.elpais.com/rss/elpais/inenglish.xml","ElPais","Politics"],
+  ["https://www.thelocal.com/feeds/rss.php","TheLocal","Politics"],
+  // === 러시아/우크라이나/동유럽 ===
+  ["https://www.rt.com/rss/news/","RT","War"],
+  ["https://sputnikglobe.com/export/rss2/archive/index.xml","Sputnik","War"],
+  ["https://www.themoscowtimes.com/rss/news","MoscowTimes","War"],
+  ["https://kyivindependent.com/feed/","KyivIndependent","War"],
+  ["https://www.pravda.com.ua/rss/","Pravda","War"],
+  // === 중동 ===
+  ["https://www.timesofisrael.com/feed/","TimesOfIsrael","War"],
+  ["https://www.jpost.com/rss/rssfeedsheadlines.aspx","JPost","War"],
+  ["https://english.alarabiya.net/.mrss/en.xml","AlArabiya","War"],
+  ["https://www.middleeasteye.net/rss","MiddleEastEye","War"],
+  ["https://www.al-monitor.com/rss","AlMonitor","Politics"],
+  ["https://en.mehrnews.com/rss","MehrNews","War"],
+  // === 아시아 ===
+  ["https://www.scmp.com/rss/91/feed","SCMP","War"],
+  ["https://english.kyodonews.net/rss/news.xml","Kyodo","Politics"],
+  ["https://www3.nhk.or.jp/rss/news/cat6.xml","NHK","Politics"],
+  ["https://feeds.feedburner.com/ndtvnews-world-news","NDTV","War"],
+  ["https://www.thehindu.com/news/international/feeder/default.rss","TheHindu","Politics"],
+  ["https://asia.nikkei.com/rss/feed/nar","Nikkei","Economy"],
+  ["https://www.channelnewsasia.com/rssfeeds/8395986","CNA","Politics"],
+  ["https://www.koreaherald.com/rss/020000000000.xml","KoreaHerald","Politics"],
+  // === 아프리카/남미 ===
+  ["https://allafrica.com/tools/headlines/rdf/latest/headlines.rdf","AllAfrica","Politics"],
+  ["https://www.batimes.com.ar/feed","BuenosAiresTimes","Politics"],
+  ["https://riotimesonline.com/feed/","RioTimes","Politics"],
+  // === 경제 ===
   ["https://feeds.bbci.co.uk/news/business/rss.xml","BBC Biz","Economy"],
-  ["https://feeds.npr.org/1014/rss.xml","NPR","Politics"],
+  ["https://www.cnbc.com/id/100727362/device/rss/rss.html","CNBC","Economy"],
+  ["https://feeds.marketwatch.com/marketwatch/topstories","MarketWatch","Economy"],
+  ["https://www.ft.com/rss/home","FT","Economy"],
+  // === 정치/외교 분석 ===
+  ["https://foreignpolicy.com/feed/","ForeignPolicy","Politics"],
+  ["https://www.cfr.org/rss.xml","CFR","Politics"],
+  ["https://www.politico.com/rss/politicopicks.xml","Politico","Politics"],
 ];
 let rssTotal=0;
+function parseRssDate(s){
+  if(!s) return 0;
+  const t=Date.parse(s.trim());
+  return isNaN(t)?0:Math.floor(t/1000);
+}
 async function pullRSS(url,source,dcat){
   try{
     let txt=null;
@@ -584,32 +899,49 @@ async function pullRSS(url,source,dcat){
     if(!txt) return;
     const doc=new DOMParser().parseFromString(txt,"text/xml");
     const items=doc.querySelectorAll("item, entry");
+    const now=Math.floor(Date.now()/1000);
+    const MAX_AGE=36*3600; // 36시간 이내 기사만 (속보 위주)
     items.forEach(it=>{
       const title=(it.querySelector("title")?.textContent||"").trim();
       if(!title) return;
       const linkEl=it.querySelector("link");
       const link=(linkEl?.textContent||linkEl?.getAttribute("href")||"").trim();
       const desc=(it.querySelector("description, summary")?.textContent||"").replace(/<[^>]+>/g,"").trim().slice(0,200);
-      // 이미지
+      // 발행 시각 파싱
+      const pub=(it.querySelector("pubDate, published, updated, date")?.textContent||"").trim();
+      let ts=parseRssDate(pub);
+      if(!ts) ts=now;                       // 시각 없으면 현재로
+      if(now-ts > MAX_AGE) return;          // 36시간 넘은 오래된 기사 제외
       let img="";
       const media=it.querySelector("thumbnail, content, enclosure");
       if(media) img=media.getAttribute("url")||"";
       const loc=placeOf(title+" "+desc); if(!loc) return;
       const [pname,lat,lng]=loc;
-      const id=hid("RSS",source,title.slice(0,40));
-      if(store.has(id))return;
       const cat=catTxt(title+" "+desc,dcat);
       const imp=scoreTxt(title+" "+desc);
+      // 회고/분석성 기사 제외 (최신 발행이어도 옛날 사건 다루는 것)
+      const ttl=(title+" "+desc).toLowerCase();
+      if(/years ago|anniversary|remembering|looking back|in history|decade|retrospect|throwback|on this day|obituary|how .* changed|the story of|explained|analysis:|opinion:|review:/.test(ttl)) return;
+      if(imp<5) return;                     // 중요도 5 미만 사소한 뉴스 제외 (새 점수체계 기준)
+      const id=hid("RSS",source,title.slice(0,40));
+      if(store.has(id))return;
       store.set(id,{id,title:title.slice(0,160),lat,lng,category:cat,impact_score:imp,
-        source,url:link,place:pname,ts:Math.floor(Date.now()/1000),img,summary:desc});
+        source,url:link,place:pname,ts,img,summary:desc});
       rssTotal++;
     });
   }catch(e){console.error("RSS",source,e);}
 }
 async function pullAllRSS(){
   rssTotal=0;
-  for(const [url,src,cat] of RSS_FEEDS){
-    await pullRSS(url,src,cat);
+  // 5개씩 병렬로 묶어 받음 (47개 순차는 느림)
+  const BATCH=5;
+  for(let i=0;i<RSS_FEEDS.length;i+=BATCH){
+    const chunk=RSS_FEEDS.slice(i,i+BATCH);
+    await Promise.all(chunk.map(([url,src,cat])=>pullRSS(url,src,cat)));
+    // 중간중간 화면 갱신 (점진적 표시)
+    const el=document.getElementById("gdeltstat");el.style.display="block";
+    el.textContent=`📰 뉴스 수신중… ${rssTotal}건`;
+    pruneAndPublish();
   }
   const el=document.getElementById("gdeltstat");el.style.display="block";
   el.textContent=`📰 뉴스 ${rssTotal+gdeltTotal}건 (RSS ${rssTotal} · GDELT ${gdeltTotal})`;
@@ -719,7 +1051,7 @@ async function pullSats(){
       }
     }catch(e){console.error("sat",grp,e);}
   }
-  if(list.length)loadSats(list.slice(0,900));
+  if(list.length)loadSats(list.slice(0,1500));
 }
 
 // ---- threat 계산 (main.py compute_threat 포팅) ----
@@ -730,7 +1062,7 @@ function computeThreat(){
   const war=recent.filter(e=>e.category==="War"&&e.impact_score>=7).length;
   const eco=recent.filter(e=>e.category==="Economy"&&e.impact_score>=8).length;
   const s=crit*2+war+eco;
-  let lvl=5;if(s>=180)lvl=1;else if(s>=120)lvl=2;else if(s>=70)lvl=3;else if(s>=30)lvl=4;
+  let lvl=5;if(s>=300)lvl=1;else if(s>=200)lvl=2;else if(s>=120)lvl=3;else if(s>=55)lvl=4;
   return {level:lvl,critical_24h:crit,war_24h:war,eco_24h:eco,total_24h:recent.length};
 }
 function pruneAndPublish(){
@@ -765,18 +1097,28 @@ async function directGDELT(){
 }
 async function cycleEvents(){
   setStatus("⟳ syncing news…",true);
-  // RSS 주력 (안정적)
-  await pullAllRSS();
-  // GDELT 보조 (rate limit 있을 수 있음 — 백그라운드로 시도)
-  directGDELT().catch(()=>{});
+  let got=0;
+  // Worker가 수집한 뉴스를 받음 (브라우저 부하 거의 0)
+  try{
+    const r=await fetch(EVENTS_URL+"?t="+Math.floor(Date.now()/60000)); // 1분 단위 캐시키
+    const j=await r.json();
+    (j.events||[]).forEach(e=>{ if(!store.has(e.id)) store.set(e.id,e); });
+    got=(j.events||[]).length;
+    if(j.updated) document.getElementById("loaded").textContent=new Date(j.updated*1000).toLocaleTimeString();
+  }catch(e){ console.warn("worker /events 실패",e); }
+  // Worker가 비었으면 브라우저가 직접 RSS (폴백)
+  if(got===0 && store.size===0){ await pullAllRSS(); }
+  else { document.getElementById("gdeltstat").style.display="block";
+         document.getElementById("gdeltstat").textContent=`📰 뉴스 ${got}건 (서버 수집)`; }
+  pruneAndPublish();
 }
 async function cycleGeo(){ await Promise.all([pullFront(),pullQuakes()]); }
 setInterval(()=>{ if(map.hasLayer(satLayer)) pullSats().then(()=>updateSats()); }, 3600000);
 
 cycleEvents();
 cycleGeo();
-setInterval(cycleEvents,90000);
-setInterval(cycleGeo,300000);
+setInterval(cycleEvents,120000);  // 2분 (서버가 수집하니 자주 받을 필요 없음)
+setInterval(cycleGeo,300000);     // 5분
 </script>
 </body>
 </html>
